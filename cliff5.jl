@@ -305,7 +305,7 @@ function pure_ee_across_all_cuts(state, cut_point)
     end
 
     current_sum = 0
-    for i in 1:n
+    for i in 1:cut_point
         current_sum += rho_left[i]
         ees[i] += current_sum
     end
