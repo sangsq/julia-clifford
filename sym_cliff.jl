@@ -244,7 +244,25 @@ function apply_gate_2d!(state, gate, shape, cors)
     gate(state, positions)
 end
 
+function zz_adam_gate(p, sym, dilution=1)
+    function tmp(state, posi1, posi2)
+        m, n = size(state)
+        if rand() < dilution
+            cliff = sym ? random_Z2_2clifford() : random_2clifford()
+            cliff2_action(cliff, state, posi1, posi2)
+        end
 
+        if rand() < p * dilution
+            ZZ_measurement!(state, (posi1 - 2) % n + 1, posi1)
+        end
+        
+        if rand() < p * dilution
+            ZZ_measurement!(state, posi1, posi2)
+        end
+        return state
+    end
+    return tmp
+end
 
 function square_region(x_range, y_range, shape)
     tmp = []
