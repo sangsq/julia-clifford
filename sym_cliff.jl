@@ -253,7 +253,11 @@ function zz_adam_gate(p, sym, dilution=1)
         end
 
         if rand() < p * dilution
-            ZZ_measurement!(state, (posi1 - 2) % n + 1, posi1)
+            if posi1 == 1
+                ZZ_measurement!(state, n, posi1)
+            else
+                ZZ_measurement!(state, posi1-1, posi1)
+            end
         end
         
         if rand() < p * dilution
