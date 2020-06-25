@@ -124,25 +124,6 @@ function cal_phi(state, connected)
     end
 
     return phi / N
-end
-
-
-function two_point_correlation_square(state, i, j, connected=true, d_i=Z, d_j=Z)
-    M, N = size(state)
-    a = [commute(p, d_i) for p in state[:, i]]
-    b = [commute(p, d_j) for p in state[:, j]]
-    tmp = [true for _ in 1:M]
-    result = Int(a == b) - Int(a == b == tmp) * Int(connected)
-    return result
-end
-
-
-function two_point_mutual_info(state, i, j)
-    M_AB = view(state, :, [i, j])
-    M_A = view(state, :, [i])
-    M_B = view(state, :, [j])
-    r_A, r_B, r_AB = rk(M_A), rk(M_B), rk(M_AB)
-    return r_A + r_B - r_AB
 end   
 
 
