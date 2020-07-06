@@ -340,4 +340,3 @@ function mutual_info(state, regionA, regionB)
     r_A, r_B, r_AB = rk(M_A), rk(M_B), rk(M_AB)
     return r_A + r_B - r_AB
 end
-    

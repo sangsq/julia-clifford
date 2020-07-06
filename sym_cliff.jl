@@ -145,6 +145,29 @@ function mixed_gate(r, p, sym)
 end
 
 
+function mixed_gate_on4(r, p, sym)
+    function tmp(state, posi1, posi2, posi3, posi4)
+        if rand() > p
+            cliff = sym ? random_Z2_clifford(4) : random_clifford(4)
+            clifford_action_on_state(cliff, state, [posi1, posi2, posi3, posi4])
+        else
+            if rand() > r
+                X_measurement!(state, posi1)
+            else
+                ZZ_measurement!(state, posi1, posi2)
+            end
+            if rand() > r
+                X_measurement!(state, posi3)
+            else
+                ZZ_measurement!(state, posi3, posi4)
+            end
+        end
+        return state
+    end
+    return tmp
+end
+
+
 function free_mixed_gate(r, p, sym)
     swap12 = ((X, II), (Z, II), (Y, II), (II, X), (II, Y), (II, Z))
     swap23 = ((Z, Y), (Y, II), (X, Y), (Y, Z), (II, Y), (Y, X))
