@@ -127,123 +127,123 @@ end
 #     return xor(tmp...)
 # end
 
-function binary_symplectic_inner(x, y)
-    a = x[1:2:end] .* y[2:2:end]
-    b = y[1:2:end] .* x[2:2:end]
-    a = xor(a...)
-    b = xor(b...)
-    return xor(a,b)
-end
+# function binary_symplectic_inner(x, y)
+#     a = x[1:2:end] .* y[2:2:end]
+#     b = y[1:2:end] .* x[2:2:end]
+#     a = xor(a...)
+#     b = xor(b...)
+#     return xor(a,b)
+# end
 
-function binary_random_symplectic_matrix(n)
-    b_mat = diagm([true for _ in 1:2n])
-    rand_idx = [true for _ in 1:2n]
-    x_img = zeros(Bool, 2n)
-    z_img = zeros(Bool, 2n)
+# function binary_random_symplectic_matrix(n)
+#     b_mat = diagm([true for _ in 1:2n])
+#     rand_idx = [true for _ in 1:2n]
+#     x_img = zeros(Bool, 2n)
+#     z_img = zeros(Bool, 2n)
 
-    for i in 1:n
+#     for i in 1:n
 
-        while true
-            x_img .= false
-            rand!(rand_idx)
-            for j in 2i-1 : 2n
-                rand_idx[j] && (x_img .⊻= b_mat[:, j])
-            end
-            any(x_img) && break
-        end
+#         while true
+#             x_img .= false
+#             rand!(rand_idx)
+#             for j in 2i-1 : 2n
+#                 rand_idx[j] && (x_img .⊻= b_mat[:, j])
+#             end
+#             any(x_img) && break
+#         end
         
-        while true
-            z_img .= false
-            rand!(rand_idx)
-            for j in 2i-1 : 2n
-                rand_idx[j] && (z_img .⊻= b_mat[:, j])
-            end
-            any(x_img) && binary_symplectic_inner(x_img, z_img) && break
-        end
+#         while true
+#             z_img .= false
+#             rand!(rand_idx)
+#             for j in 2i-1 : 2n
+#                 rand_idx[j] && (z_img .⊻= b_mat[:, j])
+#             end
+#             any(x_img) && binary_symplectic_inner(x_img, z_img) && break
+#         end
 
-        if i<n
-            x_bad_idx = [j for j in 2i-1:2n if binary_symplectic_inner(x_img, b_mat[:, j])]
-            piv = x_bad_idx[1]
-            for k in x_bad_idx[2:end]
-                b_mat[:, k] .⊻= b_mat[:, piv]
-            end
-            b_mat[:, piv]= b_mat[:, 2i-1]
+#         if i<n
+#             x_bad_idx = [j for j in 2i-1:2n if binary_symplectic_inner(x_img, b_mat[:, j])]
+#             piv = x_bad_idx[1]
+#             for k in x_bad_idx[2:end]
+#                 b_mat[:, k] .⊻= b_mat[:, piv]
+#             end
+#             b_mat[:, piv]= b_mat[:, 2i-1]
 
-            z_bad_idx = [j for j in 2i:2n if binary_symplectic_inner(z_img, b_mat[:, j])]     
-            piv = z_bad_idx[1]
-            for k in z_bad_idx[2:end]
-                b_mat[:, k] .⊻= b_mat[:, piv]
-            end
-            b_mat[:, piv] = b_mat[:, 2i]
-        end
+#             z_bad_idx = [j for j in 2i:2n if binary_symplectic_inner(z_img, b_mat[:, j])]     
+#             piv = z_bad_idx[1]
+#             for k in z_bad_idx[2:end]
+#                 b_mat[:, k] .⊻= b_mat[:, piv]
+#             end
+#             b_mat[:, piv] = b_mat[:, 2i]
+#         end
 
-        b_mat[:, 2i-1], b_mat[:, 2i] = x_img, z_img
-    end
+#         b_mat[:, 2i-1], b_mat[:, 2i] = x_img, z_img
+#     end
     
-    return b_mat
-end
+#     return b_mat
+# end
 
 
-function binary_random_orthogonal_matrix(n)
-    b_mat = diagm([true for _ in 1:n])
-    rand_idx = [true for _ in 1:n]
-    x_img = zeros(Bool, n)
-    i_finished = zeros(Bool, n)
+# function binary_random_orthogonal_matrix(n)
+#     b_mat = diagm([true for _ in 1:n])
+#     rand_idx = [true for _ in 1:n]
+#     x_img = zeros(Bool, n)
+#     i_finished = zeros(Bool, n)
 
-    i = 1
-    while i <= n
-        while true
-            x_img .= false
-            rand!(rand_idx)
-            for j in i:n
-                rand_idx[j] && (x_img .⊻= b_mat[:, j])
-            end
-            if xor(x_img...)
-                (i > 1) && (i_finished[i-1] = true)
-                break
-            else
-                (i == 1 || i_finished[i-1]) && continue
-                i = i - 1
-            end
-        end
+#     i = 1
+#     while i <= n
+#         while true
+#             x_img .= false
+#             rand!(rand_idx)
+#             for j in i:n
+#                 rand_idx[j] && (x_img .⊻= b_mat[:, j])
+#             end
+#             if xor(x_img...)
+#                 (i > 1) && (i_finished[i-1] = true)
+#                 break
+#             else
+#                 (i == 1 || i_finished[i-1]) && continue
+#                 i = i - 1
+#             end
+#         end
 
-        if i<n
-            bad_idx = [j for j in i:n if binary_inner(x_img, b_mat[:, j])]
-            tmp = bad_idx[1]
-            for k in bad_idx[2:end]
-                b_mat[:, k] .⊻= b_mat[:, tmp]
-            end
-            b_mat[:, tmp] = b_mat[:, i]
-            b_mat[:, i] = x_img
-        end
+#         if i<n
+#             bad_idx = [j for j in i:n if binary_inner(x_img, b_mat[:, j])]
+#             tmp = bad_idx[1]
+#             for k in bad_idx[2:end]
+#                 b_mat[:, k] .⊻= b_mat[:, tmp]
+#             end
+#             b_mat[:, tmp] = b_mat[:, i]
+#             b_mat[:, i] = x_img
+#         end
 
-        i += 1
-    end
+#         i += 1
+#     end
 
-    return b_mat
-end
+#     return b_mat
+# end
 
 
-function binary_jordan_wigner_transform!(mat)
-    """
-    Turn an orthogonal binary matrix into an Z2 symplectic one or vise versa
-    """
-    m, n = size(mat)
-    @assert (m == n) && (m % 2 == 0)
-    for row in 1:m
-        current_p = false
-        for col in (n-1):-2:1
-            mat[row, col:col+1] .⊻= current_p
-            current_p ⊻= (mat[row, col] ⊻ mat[row, col+1])
-        end
-    end
-    for col in 1:m
-        current_p = false
-        for row in (n-1):-2:1
-            mat[row:row+1, col] .⊻= current_p
-            current_p ⊻= (mat[row, col] ⊻ mat[row+1, col])
-        end
-    end
-    return mat
-end
+# function binary_jordan_wigner_transform!(mat)
+#     """
+#     Turn an orthogonal binary matrix into an Z2 symplectic one or vise versa
+#     """
+#     m, n = size(mat)
+#     @assert (m == n) && (m % 2 == 0)
+#     for row in 1:m
+#         current_p = false
+#         for col in (n-1):-2:1
+#             mat[row, col:col+1] .⊻= current_p
+#             current_p ⊻= (mat[row, col] ⊻ mat[row, col+1])
+#         end
+#     end
+#     for col in 1:m
+#         current_p = false
+#         for row in (n-1):-2:1
+#             mat[row:row+1, col] .⊻= current_p
+#             current_p ⊻= (mat[row, col] ⊻ mat[row+1, col])
+#         end
+#     end
+#     return mat
+# end
 
