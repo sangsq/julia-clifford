@@ -96,36 +96,46 @@ function zp_rank(m, p)
     return size(zp_uppertrianglize(m, p)[2])[1]
 end
 
-# function binary_bidirectional_gaussian!(mat)
-#     m, n = size(mat)
-#     pivs, _ = binary_uppertrianglize!(mat)
-#     row_finished = [false for _ in 1:m]
-#     end_points = zeros(Int, m, 2)
-#     for col in n:-1:1
-#         good_rows = [row for row in 1:m if mat[row, col] && !row_finished[row]]
-#         isempty(good_rows) && continue
-#         the_row = good_rows[end]
+function zp_bidirectional_gaussian!(mat, p)
+    m, n = size(mat)
+    pivs, _ = zp_uppertrianglize!(mat, p)
+    row_finished = [false for _ in 1:m]
+    end_points = zeros(Int, m, 2)
+    for col in n:-1:1
+        good_rows = [row for row in 1:m if mat[row, col] && !row_finished[row]]
+        isempty(good_rows) && continue
+        the_row = good_rows[end]
+        
+        iv = invmod(mat[the_row, end], p)
+        mat[the_row, :] .*= iv
+        mat[the_row, :] .%= p
 
-#         for row in good_rows[1:end-1]
-#             mat[row, :] .⊻= mat[the_row, :]
-#         end
+        for row in good_rows[1:end-1]
+            mat[row, :] -= mat[row, end] * mat[the_row, :]
+            mat[row, :] .%= p
+        end
 
-#         row_finished[the_row] = true
-#         end_points[the_row, :] = [pivs[the_row], col]
-#     end
-#     return end_points
-# end
+        row_finished[the_row] = true
+        end_points[the_row, :] = [pivs[the_row], col]
+    end
+    return end_points
+end
 
-# function binary_bidirectional_gaussian(mat)
-#     mat = copy(mat)
-#     end_points = binary_bidirectional_gaussian!(mat)
-#     return mat, end_points
-# end
+function zp_bidirectional_gaussian(mat)
+    mat = copy(mat)
+    end_points = zp_bidirectional_gaussian!(mat)
+    return mat, end_points
+end
 
-# function zp_inner(x, y)
-#     tmp = x .* y
-#     return xor(tmp...)
-# end
+function zp_inner(x, y, p)
+    tmp = x .* y
+    tmp .%= p
+    result = 0
+    for i in tmp
+        result = (result + i) % p
+    end
+    return result
+end
 
 # function binary_symplectic_inner(x, y)
 #     a = x[1:2:end] .* y[2:2:end]

@@ -272,6 +272,7 @@ function zz_adam_gate(p, sym, dilution=1)
     return tmp
 end
 
+
 function square_region(x_range, y_range, shape)
     tmp = []
     for idx1 in x_range
