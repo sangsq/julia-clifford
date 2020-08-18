@@ -478,9 +478,6 @@ function antipodal_mutual_info(state, rd_list)
     end
 
     mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in rd_list]
-    display(rk_A)
-    display(rk_B)
-    display(rk_AB)
     
     return mis
 end
