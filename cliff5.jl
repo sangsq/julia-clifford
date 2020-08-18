@@ -485,27 +485,27 @@ function antipodal_mutual_info(state, rd_list)
     return mis
 end
 
-n = 50
-s = 30
-r_list =1:25
+# n = 50
+# s = 30
+# r_list =1:25
 
-a = all_plus(n)
-for _ in 1:s
-    for i in 1:2:n-1
-        cliff2_action(random_2clifford(), a, i, i+1)
-    end
-    for i in 2:2:n-1
-        cliff2_action(random_2clifford(), a, i, i+1)
-    end
-end
+# a = all_plus(n)
+# for _ in 1:s
+#     for i in 1:2:n-1
+#         cliff2_action(random_2clifford(), a, i, i+1)
+#     end
+#     for i in 2:2:n-1
+#         cliff2_action(random_2clifford(), a, i, i+1)
+#     end
+# end
 
-mid = div(n,2)
+# mid = div(n,2)
 # u = antipodal_negativity(a, r_list)
 # tu = [negativity(sub_area_state(a, union(1:r, mid .+ (1:r))),1:r) for r in r_list]
 # @show u - tu
-v = antipodal_mutual_info(a, r_list)
-tv = [mutual_info(a, 1:r, mid.+(1:r)) for r in r_list]
-@show (v - tv)
+# v = antipodal_mutual_info(a, r_list)
+# tv = [mutual_info(a, 1:r, mid.+(1:r)) for r in r_list]
+# @show (v - tv)
 
 
 
