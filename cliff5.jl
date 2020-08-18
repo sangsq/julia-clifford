@@ -286,9 +286,7 @@ function pure_state_bipartite_entropy(state, sub_area)
 
     c_rk = rk(state[:, sub_area_c])
     ee = sub_size - M + c_rk
-    if ee < 0
-        display(state)
-    end
+
     return ee
 end
 
@@ -337,44 +335,13 @@ function mutual_info(state, regionA, regionB)
     M_AB = view(state, :, union(regionA, regionB))
     M_A = view(state, :, regionA)
     M_B = view(state, :, regionB)
-    r_A, r_B, r_AB = rk(M_A), rk(M_B), rk(M_AB)
+    @show r_A, r_B, r_AB = rk(M_A), rk(M_B), rk(M_AB)
     return r_A + r_B - r_AB
 end
 
 
-function antipodal_negativity(state, rd_list)
-    state = copy(state)
-    n = size(state, 1)
-    mid = div(n, 2)
-    state[:, 1:2:end], state[:, 2:2:end] = state[:, 1:mid], state[:, (mid+1):end]
-    
-    mat = to_binary_matrix(state)
-    end_points = binary_bidirectional_gaussian!(mat)
-    tmp = [(i, end_points[i, 2]) for i in 1:n]
-    sort!(tmp, by= x-> x[2])
-    new_order = [a[1] for a in tmp]
-    mat, end_points = mat[new_order, :], end_points[new_order, :]
-
-    mask_A = [0<i%4<3 for i in 1:2n]
-    mat_A = mat[:, mask_A]
-
-    gk = [n for _ in 1:n]
-    j = 1
-    for i in 1:n
-        k = end_points[i, 2]
-        spin_k = div(k+1, 2)
-        gk[j:spin_k-1] .= i-1
-        j = spin_k
-    end
-
-    K = zeros(Bool, n, n)
-    for i in 1:n
-        for j in 1:i
-            K[i, j] = K[j, i] = binary_symplectic_inner(mat_A[i, :], mat_A[j, :])
-        end
-    end
-
-    ### code from yaodong ###
+function all_diagonal_ranks(K)
+    n = size(K, 1)
     rank_K = Int[]
 	pivot    = [0 for i in 1:n]
     is_pivot = [false for i in 1:n]
@@ -412,35 +379,133 @@ function antipodal_negativity(state, rd_list)
 		end
 
 		push!(rank_K, r_tmp)
-	end
-    ### code from yaodong ###
+    end
+    return rank_K
+end
 
+function antipodal_negativity(state, rd_list)
+    state = copy(state)
+    n = size(state, 1)
+    mid = div(n, 2)
+    state[:, 1:2:end], state[:, 2:2:end] = state[:, 1:mid], state[:, (mid+1):end]
+    
+    mat = to_binary_matrix(state)
+    end_points = binary_bidirectional_gaussian!(mat)
+    tmp = [(i, end_points[i, 2]) for i in 1:n]
+    sort!(tmp, by= x-> x[2])
+    new_order = [a[1] for a in tmp]
+    mat, end_points = mat[new_order, :], end_points[new_order, :]
+
+    mask_A = [0<i%4<3 for i in 1:2n]
+    mat_A = mat[:, mask_A]
+
+    gk = [n for _ in 1:n]
+    j = 1
+    for i in 1:n
+        k = end_points[i, 2]
+        spin_k = div(k+1, 2)
+        gk[j:spin_k-1] .= i-1
+        j = spin_k
+    end
+
+    K = zeros(Bool, n, n)
+    for i in 1:n
+        for j in 1:i
+            K[i, j] = K[j, i] = binary_symplectic_inner(mat_A[i, :], mat_A[j, :])
+        end
+    end
+    rank_K = all_diagonal_ranks(K)
     # ngs = [binary_rank(K[1:gk[2r], 1:gk[2r]]) for r in rd_list]
     ngs = [gk[2r]==0 ? 0 : rank_K[gk[2r]] for r in rd_list]
     return ngs
 end
 
-# n = 200
-# s = 100
-# a = all_plus(n)
-# for _ in 1:s
-#     for i in 1:2:n-1
-#         cliff2_action(random_2clifford(), a, i, i+1)
-#     end
-#     for i in 2:2:n-1
-#         cliff2_action(random_2clifford(), a, i, i+1)
-#     end
-# end
-# r_list = 2:2:100
+function antipodal_mutual_info(state, rd_list)
+    state = copy(state)
+    n = size(state, 1)
+    mid = div(n, 2)
+    state[:, 1:2:end], state[:, 2:2:end] = state[:, 1:mid], state[:, (mid+1):end]
+    
+    mat_AB = to_binary_matrix(state)
+    mask = [0<i%4<3 for i in 1:2n]
+    mat_A = mat_AB[:, mask]
+    mat_B = mat_AB[:, .!mask]
 
-# mid = div(n,2)
-# # u = antipodal_negativity(a, r_list)
-# # tu = [negativity(sub_area_state(a, union(1:r, mid .+ (1:r))),1:r) for r in r_list]
-# # @show u - tu
-# v = antipodal_mutual_info(a, r_list)
-# tv = [mutual_info(a, 1:r, mid.+(1:r)) for r in r_list]
-# @show (v - tv)
+    end_points_AB = binary_bidirectional_gaussian!(mat_AB)
+    end_points_A = binary_bidirectional_gaussian!(mat_A)
+    end_points_B = binary_bidirectional_gaussian!(mat_B)
 
+    rk_AB = [0 for _ in 1:n]
+    j = 1  
+    for i in 1:n
+        k = end_points_AB[i, 1]
+        if k==0
+            rk_AB[j:end] .= i-1
+            break
+        end
+        spin_k = div(k+1, 2)
+        rk_AB[j:spin_k-1] .= i-1
+        j = spin_k
+        (i==n) && (rk_AB[j:end] .= n)
+    end
+
+    rk_A = [0 for _ in 1:div(n,2)]
+    j = 1
+    for i in 1:n
+        k = end_points_A[i, 1]
+        if k==0
+            rk_A[j:end] .= i-1
+            break
+        end
+        spin_k = div(k+1, 2)
+        rk_A[j:spin_k-1] .= i-1
+        j = spin_k
+        (i==n) && (rk_A[j:end] .= n)
+    end
+
+    rk_B = [0 for _ in 1:div(n,2)]
+    j = 1
+    for i in 1:n
+        k = end_points_B[i, 1]
+        if k==0
+            rk_B[j:end] .= i-1
+            break
+        end
+        spin_k = div(k+1, 2)
+        rk_B[j:spin_k-1] .= i-1
+        j = spin_k
+        (i==n) && (rk_B[j:end] .= n)
+    end
+
+    mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in rd_list]
+    display(rk_A)
+    display(rk_B)
+    display(rk_AB)
+    
+    return mis
+end
+
+n = 50
+s = 30
+r_list =1:25
+
+a = all_plus(n)
+for _ in 1:s
+    for i in 1:2:n-1
+        cliff2_action(random_2clifford(), a, i, i+1)
+    end
+    for i in 2:2:n-1
+        cliff2_action(random_2clifford(), a, i, i+1)
+    end
+end
+
+mid = div(n,2)
+# u = antipodal_negativity(a, r_list)
+# tu = [negativity(sub_area_state(a, union(1:r, mid .+ (1:r))),1:r) for r in r_list]
+# @show u - tu
+v = antipodal_mutual_info(a, r_list)
+tv = [mutual_info(a, 1:r, mid.+(1:r)) for r in r_list]
+@show (v - tv)
 
 
 
