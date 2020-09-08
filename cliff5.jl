@@ -335,7 +335,7 @@ function mutual_info(state, regionA, regionB)
     M_AB = view(state, :, union(regionA, regionB))
     M_A = view(state, :, regionA)
     M_B = view(state, :, regionB)
-    @show r_A, r_B, r_AB = rk(M_A), rk(M_B), rk(M_AB)
+    r_A, r_B, r_AB = rk(M_A), rk(M_B), rk(M_AB)
     return r_A + r_B - r_AB
 end
 
@@ -482,6 +482,12 @@ function antipodal_mutual_info(state, rd_list)
     return mis
 end
 
+
+function mutual_neg(state, A, B)
+    sub_state = sub_area_state(state, union(A, B))
+    mn = negativity(sub_state, 1:length(A))
+    return mn
+end
 # n = 50
 # s = 30
 # r_list =1:25
