@@ -116,12 +116,74 @@ function binary_inner(x, y)
     return xor(tmp...)
 end
 
+function binary_all_diagonal_ranks(K)
+    n = size(K, 1)
+    rank_K = Int[]
+    pivot    = [0 for i in 1:n]
+    is_pivot = [false for i in 1:n]
+
+    r_tmp = 0
+    for i = 1:n
+        for j = 1:i-1
+            if (is_pivot[j] == 0) && (K[j,i] == 1)
+                if pivot[i] == 0
+                    pivot[i] = j
+                    is_pivot[j] = 1
+                    r_tmp += 1
+                else
+                    for k = 1:n
+                        K[j, k] = xor(K[j,k], K[pivot[i], k])
+                    end
+                end
+            end
+        end
+
+        for j = 1:i
+            if K[i, j] == 1
+                if pivot[j] != 0
+                    for k = 1:n
+                        K[i, k] = xor(K[i,k], K[pivot[j], k])
+                    end
+                else
+                    pivot[j] = i
+                    is_pivot[i] = 1
+                    r_tmp += 1
+                    break
+                end
+            end
+        end
+
+        push!(rank_K, r_tmp)
+    end
+    return rank_K
+end
+
+
+function binary_all_vertical_cut_ranks!(b_mat)
+    m, n = size(b_mat)
+    end_points = binary_bidirectional_gaussian!(b_mat)
+    rks = Int[0 for _ in 1:n]
+    j = 1  
+    for i in 1:m
+        k = end_points[i, 1]
+        if k==0
+            rks[j:end] .= i-1
+            break
+        end
+        rks[j:k-1] .= i-1
+        j = k
+        (i==m) && (rks[j:end] .= m)
+    end
+    return rks
+end
+
 function binary_symplectic_inner(x, y)
-    a = x[1:2:end] .* y[2:2:end]
-    b = y[1:2:end] .* x[2:2:end]
-    a = xor(a...)
-    b = xor(b...)
-    return xor(a,b)
+    n = size(x, 1)
+    r = false
+    for i in 1:2:n
+        r = xor(r, x[i] * y[i+1], y[i] * x[i+1])
+    end
+    return r
 end
 
 function binary_random_symplectic_matrix(n)
@@ -235,4 +297,3 @@ function binary_jordan_wigner_transform!(mat)
     end
     return mat
 end
-

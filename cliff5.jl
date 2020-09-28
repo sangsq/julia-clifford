@@ -340,48 +340,14 @@ function mutual_info(state, regionA, regionB)
 end
 
 
-function all_diagonal_ranks(K)
-    n = size(K, 1)
-    rank_K = Int[]
-	pivot    = [0 for i in 1:n]
-    is_pivot = [false for i in 1:n]
-    
-	r_tmp = 0
-	for i = 1:n
-		for j = 1:i-1
-			if (is_pivot[j] == 0) && (K[j,i] == 1)
-				if pivot[i] == 0
-					pivot[i] = j
-					is_pivot[j] = 1
-					r_tmp += 1
-				else
-					for k = 1:n
-						K[j, k] = xor(K[j,k], K[pivot[i], k])
-					end
-				end
-			end
-		end
-
-		for j = 1:i
-			if K[i, j] == 1
-				if pivot[j] != 0
-					for k = 1:n
-						K[i, k] = xor(K[i,k], K[pivot[j], k])
-					end
-				else
-					pivot[j] = i
-					is_pivot[i] = 1
-					r_tmp += 1
-
-					break
-				end
-			end
-		end
-
-		push!(rank_K, r_tmp)
-    end
-    return rank_K
+function mutual_neg(state, A, B)
+    sub_state = sub_area_state(state, union(A, B))
+    mn = negativity(sub_state, 1:length(A))
+    return mn
 end
+
+
+
 
 function antipodal_negativity(state, rd_list)
     state = copy(state)
@@ -414,7 +380,7 @@ function antipodal_negativity(state, rd_list)
             K[i, j] = K[j, i] = binary_symplectic_inner(mat_A[i, :], mat_A[j, :])
         end
     end
-    rank_K = all_diagonal_ranks(K)
+    rank_K = binary_all_diagonal_ranks(K)
     # ngs = [binary_rank(K[1:gk[2r], 1:gk[2r]]) for r in rd_list]
     ngs = [gk[2r]==0 ? 0 : rank_K[gk[2r]] for r in rd_list]
     return ngs
@@ -483,113 +449,23 @@ function antipodal_mutual_info(state, rd_list)
 end
 
 
-function mutual_neg(state, A, B)
-    sub_state = sub_area_state(state, union(A, B))
-    mn = negativity(sub_state, 1:length(A))
-    return mn
+function several_mutual_info(state, a, rd_list_a, b, rd_list_b)
+    n = size(state, 1)
+    result = zeros(Int, length(rd_list_a),  length(rd_list_b))
+    bmat = to_binary_matrix(state)
+    mat_B = bmat[:, 2b+1:2b+2rd_list_b[end]]
+    rk_B = binary_all_vertical_cut_ranks!(mat_B)[2:2:end]
+
+    for i in 1:length(rd_list_a)
+        ra = rd_list_a[i]
+        mat_A = bmat[:, 2a+1:2a+2ra]
+        mat_AB = bmat[:, union(2a+1:2a+2ra, 2b+1:2b+2rd_list_b[end])] 
+        rk_A = binary_rank(mat_A)
+        rk_AB = binary_all_vertical_cut_ranks!(mat_AB)[2:2:end]
+        result[i, :] = [rk_A + rk_B[l] - rk_AB[ra+l] for l in rd_list_b]
+    end
+
+    return result
 end
-# n = 50
-# s = 30
-# r_list =1:25
-
-# a = all_plus(n)
-# for _ in 1:s
-#     for i in 1:2:n-1
-#         cliff2_action(random_2clifford(), a, i, i+1)
-#     end
-#     for i in 2:2:n-1
-#         cliff2_action(random_2clifford(), a, i, i+1)
-#     end
-# end
-
-# mid = div(n,2)
-# u = antipodal_negativity(a, r_list)
-# tu = [negativity(sub_area_state(a, union(1:r, mid .+ (1:r))),1:r) for r in r_list]
-# @show u - tu
-# v = antipodal_mutual_info(a, r_list)
-# tv = [mutual_info(a, 1:r, mid.+(1:r)) for r in r_list]
-# @show (v - tv)
 
 
-
-# function negativity_acc(s::state, sizeA, sizeB, w, rp)
-# 	n  = s.n
-# 	nG = s.m
-
-# 	K    = Matrix{Bool}(nG, nG)
-# 	for i = 1:nG, j = 1:nG
-# 		K[i,j] = 0
-# 	end
-
-# 	for pos in w[1:sizeA]
-# 		for i = 1:nG, j = i+1:nG
-# 			if mod(s.x[i+n, pos]*s.z[j+n, pos]+s.z[i+n, pos]*s.x[j+n, pos], 2) == 1
-# 				K[i,j] = mod(K[i,j]+1, 2)
-# 				K[j,i] = mod(K[j,i]+1, 2)
-# 			end
-# 		end
-#     end
-    
-# 	rank_K = []
-# 	pivot    = [0 for i in 1:nG]
-# 	is_pivot = [0 for i in 1:nG]
-
-# 	r_tmp = 0
-
-# 	for i = 1:nG
-# 		for j = 1:i-1
-# 			if (is_pivot[j] == 0) && (K[j,i] == 1)
-# 				if pivot[i] == 0
-# 					pivot[i] = j
-# 					is_pivot[j] = 1
-# 					r_tmp += 1
-# 				else
-# 					for k = 1:nG
-# 						K[j, k] = mod(K[j,k] + K[pivot[i], k], 2)
-# 					end
-# 				end
-# 			end
-# 		end
-
-# 		for j = 1:i
-# 			if K[i, j] == 1
-# 				if pivot[j] != 0
-# 					for k = 1:nG
-# 						K[i, k] = mod(K[i,k] + K[pivot[j], k], 2)
-# 					end
-# 				else
-# 					pivot[j] = i
-# 					is_pivot[i] = 1
-# 					r_tmp += 1
-
-# 					break
-# 				end
-# 			end
-# 		end
-
-# 		#@show i, r_tmp
-# 		push!(rank_K, r_tmp)
-# 	end
-
-# 	#@show rank_K
-
-# 	res = []
-# 	#res_tmp = []
-# 	now = 1
-# 	for b = sizeA+1:sizeA+sizeB
-# 		#@show b
-# 		last_now = now
-# 		while now <= nG && rp[now] <= b
-# 			now += 1
-# 		end
-
-# 		#@show now
-
-# 		if now == 1
-# 			push!(res, 0)
-# 		else
-# 			push!(res, rank_K[now-1])
-# 		end
-# 	end
-# 	return res
-# end
