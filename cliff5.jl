@@ -227,8 +227,8 @@ function sub_area_state(state::StablizerState, sub_area)
     L = size(sub_area)[1]
 
     binary_sub_area = zeros(Int, 2L)
-    binary_sub_area[1:2:2*L] += 2 .* sub_area .- 1
-    binary_sub_area[2:2:2*L] += 2 .* sub_area
+    binary_sub_area[1:2:2*L] .+= 2 .* sub_area .- 1
+    binary_sub_area[2:2:2*L] .+= 2 .* sub_area
     
     m = transpose(to_binary_matrix(state))
     m = cat(m, zeros(Bool, (2N, 2L)), dims=2)
