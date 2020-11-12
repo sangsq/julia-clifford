@@ -47,6 +47,16 @@ function *(x::PauliString, y::PauliString)
     return s, b
 end
 
+function spin_to_binary_indices(spin_indices)
+    n = length(spin_indices)
+    indices = fill(0, 2 * n)
+    for i in 1:n
+        indices[2i-1] = 2 * spin_indices[i] - 1
+        indices[2i] = 2 * spin_indices[i]
+    end
+    return indices
+end
+
 function row_sum(state, i, j)
     ps1 = state.s[i], view(state.xz[i, :])
     ps2 = state.s[j], view(state.xz[j, :])
@@ -80,11 +90,7 @@ function clifford_action!(clifford, state, positions)
     n_act = length(positions)
     @assert size(clifford.xz, 1) == n_act * 2
     m, n = size(state.xz)
-    indices = fill(0, 2 * n_act)
-    for i in 1:n_act
-        indices[2i-1] = 2 * positions[i] - 1
-        indices[2i] = 2 * positions[i]
-    end
+    indices = spin_to_binary_indices(positions)
     for i in 1:m
         tmp = 0, fill(false, 2 * n_act)
         for j in indices
@@ -101,7 +107,17 @@ function clifford_action!(clifford, state, positions)
     end
 end
 
-
+function sub_area_xz(state, sub_area)
+    b_sub_area = spin_to_binary_indices(sub_area)
+    m, n = size(state.xz)
+    l = size(s_sub_area, 1)
+    m = transpose(state.xz)
+    m = cat(m, zeros(Bool, (n, l)), dims=2)
+    m[binary_sub_area, m + 1 : m + l] += I
+    null_space = binary_null_space(m)[m + 1: m + l, :]
+    sub_xz = transpose(null_space)
+    return sub_xz
+end
 
 # function negativity(state, sub_area)
 #     return binary_rank(sign_mat(state[:, sub_area]))
