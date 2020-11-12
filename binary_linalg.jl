@@ -178,9 +178,10 @@ function binary_all_vertical_cut_ranks!(b_mat)
 end
 
 function binary_symplectic_inner(x, y)
+    @assert length(x) == length(y)
     n = size(x, 1)
     r = false
-    for i in 1:2:n
+    @inbounds for i in 1:2:n
         r = xor(r, x[i] * y[i+1], y[i] * x[i+1])
     end
     return r
