@@ -61,7 +61,7 @@ function row_sum(state, i, j)
     ps1 = state.s[i], view(state.xz[i, :])
     ps2 = state.s[j], view(state.xz[j, :])
     r = ps1 * ps2
-    state.s[j], state.xz[j, :] = r
+    state.s[i], state.xz[i, :] = r
 end
 
 commute(x1::Bool, x2::Bool, y1::Bool, y2::Bool) = !xor(x1 * y2, x2 * y1)
@@ -119,6 +119,21 @@ function sub_area_xz(state, sub_area)
     return sub_xz
 end
 
+function measurement!(state, observable, positions)
+    m = size(state.xz, 1)
+    b_positions = spin_to_binary_indices(positions)
+    uncommute_rows = [i for i in 1:m if !commute(observable, state[i, b_positions])]
+    if isempty(uncommute_rows)
+        return
+    end
+    for row in uncommute_rows[2:end]
+        row_sum(state, row, uncommute_rows[1])
+    end
+    row = uncommute_rows[1]
+    state.xz[row, :] .= false
+    state.s[row] = 2 * rand(Bool) + is_herm(0, observable)
+end
+
 # function negativity(state, sub_area)
 #     return binary_rank(sign_mat(state[:, sub_area]))
 # end
@@ -157,26 +172,26 @@ end
 #     return ee
 # end
 
-# function pure_ee_across_all_cuts(state, cut_point)
-#     m, n = size(state)
-#     mat = to_binary_matrix(state[:, 1:cut_point])
-#     ees = Array(-1:-1:-cut_point)
-#     pivs, _ = binary_uppertrianglize!(mat)
+function pure_ee_across_all_cuts(state, cut_point)
+    m, n = size(state)
+    mat = state.xz[:, 1:2cut_point]
+    ees = Array(-1:-1:-cut_point)
+    pivs, _ = binary_uppertrianglize!(mat)
 
-#     rho_left = zeros(Int, n)
-#     for b_piv in pivs
-#         piv = div(b_piv + 1, 2)
-#         rho_left[piv] += 1
-#     end
+    rho_left = zeros(Int, n)
+    for b_piv in pivs
+        piv = div(b_piv + 1, 2)
+        rho_left[piv] += 1
+    end
 
-#     current_sum = 0
-#     for i in 1:cut_point
-#         current_sum += rho_left[i]
-#         ees[i] += current_sum
-#     end
+    current_sum = 0
+    for i in 1:cut_point
+        current_sum += rho_left[i]
+        ees[i] += current_sum
+    end
 
-#     return ees
-# end
+    return ees
+end
 
 
 # function two_point_correlation_square(state, i, j, connected=true, d_i=Z, d_j=Z)
