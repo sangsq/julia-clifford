@@ -347,11 +347,63 @@ function mutual_neg(state, A, B)
 end
 
 
+function several_mutual_info(state, a, rd_list_a, b, rd_list_b)
+    n = size(state, 1)
+    result = zeros(Int, length(rd_list_a),  length(rd_list_b))
+    bmat = to_binary_matrix(state)
+    mat_B = bmat[:, 2b+1:2b+2rd_list_b[end]]
+    rk_B = binary_all_vertical_cut_ranks!(mat_B)[2:2:end]
+
+    for i in 1:length(rd_list_a)
+        ra = rd_list_a[i]
+        mat_A = bmat[:, 2a+1:2a+2ra]
+        mat_AB = bmat[:, union(2a+1:2a+2ra, 2b+1:2b+2rd_list_b[end])] 
+        rk_A = binary_rank(mat_A)
+        rk_AB = binary_all_vertical_cut_ranks!(mat_AB)[2:2:end]
+        result[i, :] = [rk_A + rk_B[l] - rk_AB[ra+l] for l in rd_list_b]
+    end
+
+    return result
+end
+
+
+function several_mutual_neg(state, a, rd_list_a, b, rd_list_b)
+    m, n = size(state)
+    result = zeros(Int, length(rd_list_a),  length(rd_list_b))
+    @assert m==n
+    for i in 1:length(rd_list_a)
+        ra = rd_list_a[i]
+        state_c = view(state, :, union(a+1:a+ra, b+1:b+rd_list_b[end], 1:a, a+ra+1:b, b+rd_list_b[end]:n))
+        mat = to_binary_matrix(state_c)
+        end_points = binary_bidirectional_gaussian!(mat)
+        tmp = [(i, end_points[i, 2]) for i in 1:n]
+        sort!(tmp, by= x-> x[2])
+        new_order = [x[1] for x in tmp]
+        mat, end_points = mat[new_order, :], end_points[new_order, :]
+        mat_A = mat[:, 1:2ra]
+        gk = [n for _ in 1:n]
+        j = 1
+        for i in 1:n
+            k = end_points[i, 2]
+            spin_k = div(k+1, 2)
+            gk[j:spin_k-1] .= i-1
+            j = spin_k
+        end
+        K = zeros(Bool, n, n)
+        for x in 1:n, y in 1:x
+            K[x, y] = K[y, x] = binary_symplectic_inner(mat_A[x, :], mat_A[y, :])
+        end
+        rank_K = binary_all_diagonal_ranks(K)
+        result[i, :] = [gk[ra+rb]==0 ? 0 : rank_K[gk[ra+rb]] for rb in rd_list_b]
+    end
+    return result
+end
 
 
 function antipodal_negativity(state, rd_list)
     state = copy(state)
-    n = size(state, 1)
+    m, n = size(state)
+    @assert m==n
     mid = div(n, 2)
     state[:, 1:2:end], state[:, 2:2:end] = state[:, 1:mid], state[:, (mid+1):end]
     
@@ -381,7 +433,6 @@ function antipodal_negativity(state, rd_list)
         end
     end
     rank_K = binary_all_diagonal_ranks(K)
-    # ngs = [binary_rank(K[1:gk[2r], 1:gk[2r]]) for r in rd_list]
     ngs = [gk[2r]==0 ? 0 : rank_K[gk[2r]] for r in rd_list]
     return ngs
 end
@@ -447,25 +498,3 @@ function antipodal_mutual_info(state, rd_list)
     
     return mis
 end
-
-
-function several_mutual_info(state, a, rd_list_a, b, rd_list_b)
-    n = size(state, 1)
-    result = zeros(Int, length(rd_list_a),  length(rd_list_b))
-    bmat = to_binary_matrix(state)
-    mat_B = bmat[:, 2b+1:2b+2rd_list_b[end]]
-    rk_B = binary_all_vertical_cut_ranks!(mat_B)[2:2:end]
-
-    for i in 1:length(rd_list_a)
-        ra = rd_list_a[i]
-        mat_A = bmat[:, 2a+1:2a+2ra]
-        mat_AB = bmat[:, union(2a+1:2a+2ra, 2b+1:2b+2rd_list_b[end])] 
-        rk_A = binary_rank(mat_A)
-        rk_AB = binary_all_vertical_cut_ranks!(mat_AB)[2:2:end]
-        result[i, :] = [rk_A + rk_B[l] - rk_AB[ra+l] for l in rd_list_b]
-    end
-
-    return result
-end
-
-
