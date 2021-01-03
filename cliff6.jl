@@ -64,7 +64,7 @@ function row_sum(state, i, j)
     state.s[i], state.xz[i, :] = r
 end
 
-commute(x1::Bool, x2::Bool, y1::Bool, y2::Bool) = !xor(x1 * y2, x2 * y1)
+commute(x1::Bool, z1::Bool, x1::Bool, z2::Bool) = !xor(x1 * z2, x2 * z1)
 commute(x, y) = !binary_symplectic_inner(x, y)
 
 function is_herm(s, xz)

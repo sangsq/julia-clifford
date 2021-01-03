@@ -1,12 +1,14 @@
+# TODO: change binary_linalg to col major operations
+
 function binary_uppertrianglize!(m)
     dim1, dim2 = size(m)
     finished_rows = 0
-    pivs = []
-    non_pivs = []
+    pivs = Int[]
+    non_pivs = Int[]
     
     for col in 1: dim2
         # look for first row with non-zeros value at col
-        row = nothing
+        row = 0
         for i in (1 + finished_rows) : dim1
             if m[i, col] == true
                 row = i
@@ -15,13 +17,13 @@ function binary_uppertrianglize!(m)
         end
 
         # if not found, skip this col
-        if row === nothing
+        if row == 0
             push!(non_pivs, col)
             continue
         else
             push!(pivs, col)
         end
-        m[row, :], m[finished_rows + 1, :] = m[finished_rows + 1, :], m[row, :]
+        m[row, 1:dim2], m[finished_rows + 1, 1:dim2] = m[finished_rows + 1, 1:dim2], m[row, 1:dim2]
 
         
         tmp_m = view(m, :, col: dim2)
@@ -31,6 +33,11 @@ function binary_uppertrianglize!(m)
             end
         end
         
+        for i in (finished_rows + 2: dim1)
+            if  tmp_m[i, 1] == true
+                tmp_m[i, :] .⊻= tmp_m[finished_rows + 1, :]
+            end
+        end
 
         finished_rows += 1
     end
@@ -116,8 +123,13 @@ function binary_inner(x, y)
     return xor(tmp...)
 end
 
-function binary_all_diagonal_ranks(K)
-    n = size(K, 1)
+
+"""
+credit: yaodong
+"""
+function binary_all_diagonal_ranks(mat)
+    @assert size(mat, 1) == size(mat, 2)
+    n = size(mat, 1)
     rank_K = Int[]
     pivot    = [0 for i in 1:n]
     is_pivot = [false for i in 1:n]
@@ -125,24 +137,24 @@ function binary_all_diagonal_ranks(K)
     r_tmp = 0
     for i = 1:n
         for j = 1:i-1
-            if (is_pivot[j] == 0) && (K[j,i] == 1)
+            if (is_pivot[j] == 0) && (mat[j,i] == 1)
                 if pivot[i] == 0
                     pivot[i] = j
                     is_pivot[j] = 1
                     r_tmp += 1
                 else
                     for k = 1:n
-                        K[j, k] = xor(K[j,k], K[pivot[i], k])
+                        mat[j, k] = xor(mat[j,k], mat[pivot[i], k])
                     end
                 end
             end
         end
 
         for j = 1:i
-            if K[i, j] == 1
+            if mat[i, j] == 1
                 if pivot[j] != 0
                     for k = 1:n
-                        K[i, k] = xor(K[i,k], K[pivot[j], k])
+                        mat[i, k] = xor(mat[i,k], mat[pivot[j], k])
                     end
                 else
                     pivot[j] = i
@@ -152,7 +164,6 @@ function binary_all_diagonal_ranks(K)
                 end
             end
         end
-
         push!(rank_K, r_tmp)
     end
     return rank_K
@@ -175,6 +186,11 @@ function binary_all_vertical_cut_ranks!(b_mat)
         (i==m) && (rks[j:end] .= m)
     end
     return rks
+end
+
+function binary_all_vertical_cut_ranks(b_mat)
+    tmp = copy(b_mat)
+    return binary_all_vertical_cut_ranks!(tmp)
 end
 
 function binary_symplectic_inner(x, y)
