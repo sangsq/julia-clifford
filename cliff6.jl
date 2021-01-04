@@ -58,14 +58,16 @@ function spin_to_binary_indices(spin_indices)
 end
 
 function row_sum(state, i, j)
-    ps1 = state.s[i], view(state.xz[i, :])
-    ps2 = state.s[j], view(state.xz[j, :])
+    ps1 = state.s[i], @view state.xz[i, :]
+    ps2 = state.s[j], @view state.xz[j, :]
     r = ps1 * ps2
     state.s[i], state.xz[i, :] = r
 end
 
+
 commute(x1::Bool, z1::Bool, x1::Bool, z2::Bool) = !xor(x1 * z2, x2 * z1)
 commute(x, y) = !binary_symplectic_inner(x, y)
+
 
 function is_herm(s, xz)
     r = false
@@ -74,6 +76,7 @@ function is_herm(s, xz)
     end
     return xor(isodd(s), r)
 end
+
 
 function random_clifford(n)
     xz = binary_random_symplectic_matrix(n)
@@ -107,6 +110,7 @@ function clifford_action!(clifford, state, positions)
     end
 end
 
+
 function sub_area_xz(state, sub_area)
     b_sub_area = spin_to_binary_indices(sub_area)
     m, n = size(state.xz)
@@ -119,12 +123,13 @@ function sub_area_xz(state, sub_area)
     return sub_xz
 end
 
+
 function measurement!(state, observable, positions)
     m = size(state.xz, 1)
     b_positions = spin_to_binary_indices(positions)
-    uncommute_rows = [i for i in 1:m if !commute(observable, state[i, b_positions])]
+    uncommute_rows = [i for i in 1:m if !commute(observable, @view state[i, b_positions])]
     if isempty(uncommute_rows)
-        return
+        return state
     end
     for row in uncommute_rows[2:end]
         row_sum(state, row, uncommute_rows[1])
@@ -132,6 +137,7 @@ function measurement!(state, observable, positions)
     row = uncommute_rows[1]
     state.xz[row, :] .= false
     state.s[row] = 2 * rand(Bool) + is_herm(0, observable)
+    return state
 end
 
 # function negativity(state, sub_area)

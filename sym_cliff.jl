@@ -73,7 +73,7 @@ function X_measurement!(state, posi)
         return state
     end
     for row in uncommute_rows[2:end]
-        state[row, :] .*= state[uncommute_rows[1], :]
+        state[row, :] .*= @view state[uncommute_rows[1], :]
     end
     row = uncommute_rows[1]
     state[row, :] .= II 
@@ -89,7 +89,7 @@ function ZZ_measurement!(state, posi1, posi2)
         return state
     end
     for row in uncommute_rows[2:end]
-        state[row, :] .*= state[uncommute_rows[1], :]
+        state[row, :] .*= @view state[uncommute_rows[1], :]
     end
     row = uncommute_rows[1]
     state[row, :] .= II

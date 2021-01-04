@@ -400,105 +400,105 @@ function several_mutual_neg(state, a, rd_list_a, b, rd_list_b)
 end
 
 
-function antipodal_negativity(state, rd_list)
-    state = copy(state)
-    m, n = size(state)
-    @assert m==n
-    mid = div(n, 2)
-    state[:, 1:2:end], state[:, 2:2:end] = state[:, 1:mid], state[:, (mid+1):end]
+# function antipodal_negativity(state, rd_list)
+#     state = copy(state)
+#     m, n = size(state)
+#     @assert m==n
+#     mid = div(n, 2)
+#     state[:, 1:2:end], state[:, 2:2:end] = state[:, 1:mid], state[:, (mid+1):end]
     
-    mat = to_binary_matrix(state)
-    end_points = binary_bidirectional_gaussian!(mat)
-    tmp = [(i, end_points[i, 2]) for i in 1:n]
-    sort!(tmp, by= x-> x[2])
-    new_order = [a[1] for a in tmp]
-    mat, end_points = mat[new_order, :], end_points[new_order, :]
+#     mat = to_binary_matrix(state)
+#     end_points = binary_bidirectional_gaussian!(mat)
+#     tmp = [(i, end_points[i, 2]) for i in 1:n]
+#     sort!(tmp, by= x-> x[2])
+#     new_order = [a[1] for a in tmp]
+#     mat, end_points = mat[new_order, :], end_points[new_order, :]
 
-    mask_A = [0<i%4<3 for i in 1:2n]
-    mat_A = mat[:, mask_A]
+#     mask_A = [0<i%4<3 for i in 1:2n]
+#     mat_A = mat[:, mask_A]
 
-    gk = [n for _ in 1:n]
-    j = 1
-    for i in 1:n
-        k = end_points[i, 2]
-        spin_k = div(k+1, 2)
-        gk[j:spin_k-1] .= i-1
-        j = spin_k
-    end
+#     gk = [n for _ in 1:n]
+#     j = 1
+#     for i in 1:n
+#         k = end_points[i, 2]
+#         spin_k = div(k+1, 2)
+#         gk[j:spin_k-1] .= i-1
+#         j = spin_k
+#     end
 
-    K = zeros(Bool, n, n)
-    for i in 1:n
-        for j in 1:i
-            K[i, j] = K[j, i] = binary_symplectic_inner(mat_A[i, :], mat_A[j, :])
-        end
-    end
-    rank_K = binary_all_diagonal_ranks(K)
-    ngs = [gk[2r]==0 ? 0 : rank_K[gk[2r]] for r in rd_list]
-    return ngs
-end
+#     K = zeros(Bool, n, n)
+#     for i in 1:n
+#         for j in 1:i
+#             K[i, j] = K[j, i] = binary_symplectic_inner(mat_A[i, :], mat_A[j, :])
+#         end
+#     end
+#     rank_K = binary_all_diagonal_ranks(K)
+#     ngs = [gk[2r]==0 ? 0 : rank_K[gk[2r]] for r in rd_list]
+#     return ngs
+# end
 
 
-function antipodal_mutual_info(state, rd_list)
-    state = copy(state)
-    n = size(state, 1)
-    mid = div(n, 2)
-    state[:, 1:2:end], state[:, 2:2:end] = state[:, 1:mid], state[:, (mid+1):end]
+# function antipodal_mutual_info(state, rd_list)
+#     state = copy(state)
+#     n = size(state, 1)
+#     mid = div(n, 2)
+#     state[:, 1:2:end], state[:, 2:2:end] = state[:, 1:mid], state[:, (mid+1):end]
     
-    mat_AB = to_binary_matrix(state)
-    mask = [0<i%4<3 for i in 1:2n]
-    mat_A = mat_AB[:, mask]
-    mat_B = mat_AB[:, .!mask]
+#     mat_AB = to_binary_matrix(state)
+#     mask = [0<i%4<3 for i in 1:2n]
+#     mat_A = mat_AB[:, mask]
+#     mat_B = mat_AB[:, .!mask]
 
-    end_points_AB = binary_bidirectional_gaussian!(mat_AB)
-    end_points_A = binary_bidirectional_gaussian!(mat_A)
-    end_points_B = binary_bidirectional_gaussian!(mat_B)
+#     end_points_AB = binary_bidirectional_gaussian!(mat_AB)
+#     end_points_A = binary_bidirectional_gaussian!(mat_A)
+#     end_points_B = binary_bidirectional_gaussian!(mat_B)
 
-    rk_AB = [0 for _ in 1:n]
-    j = 1  
-    for i in 1:n
-        k = end_points_AB[i, 1]
-        if k==0
-            rk_AB[j:end] .= i-1
-            break
-        end
-        spin_k = div(k+1, 2)
-        rk_AB[j:spin_k-1] .= i-1
-        j = spin_k
-        (i==n) && (rk_AB[j:end] .= n)
-    end
+#     rk_AB = [0 for _ in 1:n]
+#     j = 1  
+#     for i in 1:n
+#         k = end_points_AB[i, 1]
+#         if k==0
+#             rk_AB[j:end] .= i-1
+#             break
+#         end
+#         spin_k = div(k+1, 2)
+#         rk_AB[j:spin_k-1] .= i-1
+#         j = spin_k
+#         (i==n) && (rk_AB[j:end] .= n)
+#     end
 
-    rk_A = [0 for _ in 1:div(n,2)]
-    j = 1
-    for i in 1:n
-        k = end_points_A[i, 1]
-        if k==0
-            rk_A[j:end] .= i-1
-            break
-        end
-        spin_k = div(k+1, 2)
-        rk_A[j:spin_k-1] .= i-1
-        j = spin_k
-        (i==n) && (rk_A[j:end] .= n)
-    end
+#     rk_A = [0 for _ in 1:div(n,2)]
+#     j = 1
+#     for i in 1:n
+#         k = end_points_A[i, 1]
+#         if k==0
+#             rk_A[j:end] .= i-1
+#             break
+#         end
+#         spin_k = div(k+1, 2)
+#         rk_A[j:spin_k-1] .= i-1
+#         j = spin_k
+#         (i==n) && (rk_A[j:end] .= n)
+#     end
 
-    rk_B = [0 for _ in 1:div(n,2)]
-    j = 1
-    for i in 1:n
-        k = end_points_B[i, 1]
-        if k==0
-            rk_B[j:end] .= i-1
-            break
-        end
-        spin_k = div(k+1, 2)
-        rk_B[j:spin_k-1] .= i-1
-        j = spin_k
-        (i==n) && (rk_B[j:end] .= n)
-    end
+#     rk_B = [0 for _ in 1:div(n,2)]
+#     j = 1
+#     for i in 1:n
+#         k = end_points_B[i, 1]
+#         if k==0
+#             rk_B[j:end] .= i-1
+#             break
+#         end
+#         spin_k = div(k+1, 2)
+#         rk_B[j:spin_k-1] .= i-1
+#         j = spin_k
+#         (i==n) && (rk_B[j:end] .= n)
+#     end
 
-    mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in rd_list]
+#     mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in rd_list]
     
-    return mis
-end
+#     return mis
+# end
 
 function ap_negativity(state, a, b, l)
     @assert (a<b) && (a+l<=b)
@@ -561,9 +561,9 @@ function ap_mutual_info(state, a, b, l)
     mat_A = mat_AB[:, mask]
     mat_B = mat_AB[:, .!mask]
 
-    rk_AB = binary_all_vertical_cut_ranks!(mat_AB)
-    rk_A = binary_all_vertical_cut_ranks!(mat_A)
-    rk_B = binary_all_vertical_cut_ranks!(mat_B)
+    rk_AB = binary_all_vertical_cut_ranks!(mat_AB)[2:2:end]
+    rk_A = binary_all_vertical_cut_ranks!(mat_A)[2:2:end]
+    rk_B = binary_all_vertical_cut_ranks!(mat_B)[2:2:end]
 
     mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in 1:l]
     

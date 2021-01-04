@@ -23,19 +23,20 @@ function binary_uppertrianglize!(m)
         else
             push!(pivs, col)
         end
-        m[row, 1:dim2], m[finished_rows + 1, 1:dim2] = m[finished_rows + 1, 1:dim2], m[row, 1:dim2]
 
-        
-        tmp_m = view(m, :, col: dim2)
+        for k in 1:dim2
+            m[row, k], m[finished_rows + 1, k] = m[finished_rows + 1, k], m[row, k]
+        end
+
         for i in (finished_rows + 2: dim1)
-            if  tmp_m[i, 1] == true
-                tmp_m[i, :] .⊻= tmp_m[finished_rows + 1, :]
+            if  m[i, 1]
+                m[i, :] .⊻= @view m[finished_rows + 1, col : dim2]
             end
         end
         
         for i in (finished_rows + 2: dim1)
-            if  tmp_m[i, 1] == true
-                tmp_m[i, :] .⊻= tmp_m[finished_rows + 1, :]
+            if  m[i, 1]
+                m[i, :] .⊻= @view m[finished_rows + 1, col : dim2]
             end
         end
 
@@ -44,6 +45,7 @@ function binary_uppertrianglize!(m)
 
     return pivs, non_pivs
 end
+
 
 function binary_uppertrianglize(m)
     m = copy(m)
@@ -172,19 +174,16 @@ end
 
 function binary_all_vertical_cut_ranks!(b_mat)
     m, n = size(b_mat)
-    end_points = binary_bidirectional_gaussian!(b_mat)
+    pivs, _ = binary_uppertrianglize!(b_mat)
     rks = Int[0 for _ in 1:n]
-    j = 1  
-    for i in 1:m
-        k = end_points[i, 1]
-        if k==0
-            rks[j:end] .= i-1
-            break
-        end
-        rks[j:k-1] .= i-1
+    j = 1
+    r = 0
+    for k in pivs
+        rks[j:k-1] .= r
         j = k
-        (i==m) && (rks[j:end] .= m)
+        r += 1
     end
+    rks[j:end] .= length(pivs)
     return rks
 end
 
