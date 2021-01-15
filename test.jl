@@ -1,5 +1,6 @@
 using BenchmarkTools
 include("cliff5.jl")
+include("sym_cliff.jl")
 
 # Random.seed!(1)
 # let

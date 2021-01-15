@@ -249,6 +249,7 @@ function apply_gate_2d!(state, gate, shape, cors)
 end
 
 function zz_adam_gate(p, sym, dilution=1)
+    @assert "this function is problematic" == true
     function tmp(state, posi1, posi2)
         m, n = size(state)
         if rand() < dilution

@@ -24,19 +24,19 @@ function binary_uppertrianglize!(m)
             push!(pivs, col)
         end
 
-        for k in 1:dim2
+        for k in max(col-1, 1):dim2
             m[row, k], m[finished_rows + 1, k] = m[finished_rows + 1, k], m[row, k]
         end
 
         for i in (finished_rows + 2: dim1)
-            if  m[i, 1]
-                m[i, :] .⊻= @view m[finished_rows + 1, col : dim2]
+            if  m[i, col]
+                m[i, col : dim2] .⊻= @view m[finished_rows + 1, col : dim2]
             end
         end
         
         for i in (finished_rows + 2: dim1)
-            if  m[i, 1]
-                m[i, :] .⊻= @view m[finished_rows + 1, col : dim2]
+            if  m[i, col]
+                m[i, col : dim2] .⊻= @view m[finished_rows + 1, col : dim2]
             end
         end
 
