@@ -58,7 +58,7 @@ function measurement(state, observable::PauliString, positions)
         return state
     end
     for row in uncommute_rows[2:end]
-        state[row, :] .*= state[uncommute_rows[1], :]
+        state[row, :] .*= @view state[uncommute_rows[1], :]
     end
     row = uncommute_rows[1]
     state[row, :] .= II 
@@ -229,7 +229,7 @@ function cor_to_idx(cor, shape)
     i -= 1
     j -= 1
     n1, n2 = shape
-    idx = i * n2 + j
+    idx = j * n1 + i
     return idx + 1
 end
 
@@ -237,8 +237,8 @@ end
 function idx_to_cor(idx, shape)
     n1, n2 = shape
     idx -= 1
-    i = div(idx, n2)
-    j = idx % n2
+    j = div(idx, n1)
+    i = idx % n1
     return i + 1, j + 1
 end
 

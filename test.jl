@@ -37,4 +37,3 @@ function test_binary_all_vertical_cut_ranks()
     end
 end
 test_binary_all_vertical_cut_ranks()
-
