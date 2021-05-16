@@ -59,5 +59,7 @@ n = 2
 state = all_plus(2)
 ob1 = 0, [false, true]
 ob2 = 0, [true, false]
+ob3 = 0, [true, false, true, false]
 r = measurement!(state, ob1, [1], false)
 r = measurement!(state, ob2, [1], true)
+r = measurement!(state, ob1, [2], true)

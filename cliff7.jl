@@ -69,9 +69,6 @@ function random_state(n, n_stab)
 end
 
 
-
-
-
 function *(p1::PauliString, p2::PauliString)
     n = div(length(p1), 2)
     s1, b1 = p1
@@ -86,6 +83,30 @@ function *(p1::PauliString, p2::PauliString)
 end
 
 
+function copy_row!(state, i, j)
+    if i==j
+        return nothing
+    end
+    xz, s, n_stab = flat(state)
+    m, n = size(state)
+    for k in 1:2n
+        xz[i, k] = xz[j, k]
+    end
+    s[i] = s[k]
+    return nothing
+end
+
+
+function erase_row!(state, i)
+    xz, s, n_stab = flat(state)
+    m, n = size(state)
+    for k in 1:2n
+        xz[i, k] = false
+    end
+    s[i] = 0
+end
+
+
 function single_row_sum!(state, i, j)
     xz, s, n_stab = flat(state)
     m, n = size(state)
@@ -95,6 +116,30 @@ function single_row_sum!(state, i, j)
         xz[i, 2k] ⊻= xz[j, 2k]
     end
     s[i] = m4(s[i])
+    return nothing
+end
+
+
+@views function row_auto_fill!(state, i)
+    xz, s, n_stab = flat(state)
+    m, n = size(state)
+    j = i>n ? i-n : i+n
+
+    while !binary_symplectic_inner(xz[i, :], xz[j, :])
+        xz[i, :] = rand(Bool, 2n)
+    end
+    s[i] = Int(!is_herm(0, xz[i, :]))
+    for k in 1:m
+        if k==i || k==j
+            continue
+        end
+        if binary_symplectic_inner(xz[i, :], xz[k, :])
+            single_row_sum!(state, i, k+n)
+        end
+        if binary_symplectic_inner(xz[i, :], xz[k+n, :])
+            single_row_sum!(state, i, k)
+        end
+    end
     return nothing
 end
 
@@ -117,8 +162,8 @@ end
 
 function is_herm(s, xz)
     r = false
-    for i in 1:2:length(xz)
-        r ⊻= xz[i] * xz[i+1]
+    for k in 1:2:length(xz)
+        r ⊻= xz[k] * xz[k+1]
     end
     return !xor(isodd(s), r)
 end
@@ -127,9 +172,9 @@ end
 function random_clifford(n)
     xz = binary_random_symplectic_matrix(n)
     s = fill(0, 2n)
-    for i in 1:2n
-        h = is_herm(0, view(xz, i, :))
-        s[i] = m4(2 * rand(Bool) + !h)
+    for k in 1:2n
+        h = is_herm(0, view(xz, k, :))
+        s[k] = m4(2 * rand(Bool) + !h)
     end
     return Clifford(xz, s)
 end
@@ -138,9 +183,9 @@ end
 function spin_to_binary_indices(spin_indices)
     n = length(spin_indices)
     indices = fill(0, 2 * n)
-    for i in 1:n
-        indices[2i-1] = 2 * spin_indices[i] - 1
-        indices[2i] = 2 * spin_indices[i]
+    for k in 1:n
+        indices[2k-1] = 2 * spin_indices[k] - 1
+        indices[2k] = 2 * spin_indices[k]
     end
     return indices
 end
@@ -152,11 +197,11 @@ function clifford_action!(clifford, state, positions)
     m, n = size(state)
     xz, s, n_stab = flat(state)
     indices = spin_to_binary_indices(positions)
-    for i in union(1:m, 1+n:m+n)
+    for k in union(1:m, 1+n:m+n)
         tmp_s = 0
         tmp_xz = fill(false, 2 * n_act)
         for j in 1:2n_act
-            if xz[i, indices[j]]
+            if xz[k, indices[j]]
                 tmp_s += clifford.s[j]
                 for k in 1:n_act
                     tmp_s += 2 * (tmp_xz[2k] * clifford.xz[j, 2k-1])
@@ -165,25 +210,26 @@ function clifford_action!(clifford, state, positions)
                 end
             end
         end
-        s[i] = m4(tmp_s + s[i])
-        xz[i, indices] = tmp_xz
+        s[k] = m4(tmp_s + s[k])
+        xz[k, indices] = tmp_xz
     end
     return nothing
 end
 
 
-function measurement!(state, observable::PauliString, positions, record=true)
+
+@views function measurement!(state, observable::PauliString, positions, record=true)
     m, n = size(state)
     xz, s, _ = flat(state)
     indices = spin_to_binary_indices(positions)
     uc_stab_rows = Int[]
     uc_destab_rows = Int[]
-    for i in 1:m
-        if binary_symplectic_inner(observable[2], @view xz[i, indices])
-            push!(uc_stab_rows, i)
+    for k in 1:m
+        if binary_symplectic_inner(observable[2], xz[k, indices])
+            push!(uc_stab_rows, k)
         end
-        if binary_symplectic_inner(observable[2], @view xz[i+n, indices])
-            push!(uc_destab_rows, i)
+        if binary_symplectic_inner(observable[2], xz[k+n, indices])
+            push!(uc_destab_rows, k)
         end
     end
     # case 1: random outcome, some stabilizer anti-commute with observable
@@ -192,26 +238,22 @@ function measurement!(state, observable::PauliString, positions, record=true)
         for j in uc_stab_rows[2:end]
             row_sum!(state, i, j)
         end
-        # case 1.1: recorded, n_stab unchanged
+        # # case 1.1: recorded, n_stab unchanged
         if record
-            s[i+n] = s[i]
-            xz[i+n, :] .= @view xz[i, :]
+            copy_row!(state, i+n, i)
             xz[i, :] .= false
-            s[i], xz[i, indices] = observable
+            s[i] = observable[1]
+            xz[i, indices] = observable[2]
             r = rand(Bool)
             s[i] += 2 * r
             s[i] = m4(s[i])
             return r
         # case 1.2: unrecorded, n_stab - 1
         else
-            s[i] = s[m]
-            xz[i, :] = @view xz[m, :]
-            s[i+n] = s[m+n]
-            xz[i+n, :] = @view xz[m+n, :]
-            s[m] = 0
-            xz[m, :] .= false
-            s[m+n] = 0
-            xz[m+n, :] .= false
+            copy_row!(state, i, m)
+            copy_row!(state, i+n, m+n)
+            erase_row!(state, m)
+            erase_row!(state, m+n)
             state.n_stab -= 1
             return false
         end
@@ -228,28 +270,18 @@ function measurement!(state, observable::PauliString, positions, record=true)
             else
                 return true
             end
-        # case 3: random outcome, n_stab + 1
+        # case 3: random outcome, n_stab + 1 if recorded
         elseif !record
             return false
         else
-            state.n_stab += 1
             m += 1
-            s[m], xz[m, indices] = tmp
+            state.n_stab += 1
+            s[m] = tmp[1]
+            xz[m, indices] = tmp[2]
             r = rand(Bool)
             s[m] += 2r
             s[m] = m4(s[m])
-            while !binary_symplectic_inner(xz[m+n, :], xz[m, :])
-                xz[m+n, :] = rand(Bool, 2n)
-            end
-            s[m+n] = Int(!is_herm(0, @view xz[m+n, :]))
-            for i in 1:m-1
-                if binary_symplectic_inner(xz[m+n, :], xz[i, :])
-                    single_row_sum!(state, m+n, i+n)
-                end
-                if binary_symplectic_inner(xz[m+n, :], xz[i+n, :])
-                    single_row_sum!(state, m+n, i)
-                end
-            end
+            row_auto_fill!(state, m+n)
             return r
         end
     end
