@@ -1,6 +1,6 @@
 using Random
 using LinearAlgebra
-import Base:show, *, length, iterate, size
+import Base:show, *, length, iterate, size, copy
 
 include("binary_linalg.jl")
 
@@ -9,6 +9,8 @@ mutable struct StabState
     s::Array{Int, 1} # shape (2n,), {0, 1, 2, 3} -> {1, i, -1, -i}
     n_stab::Int # number of stablizer for the state
 end
+
+copy(state::StabState) = StabState(copy(state.xz), copy(state.s), state.n_stab)
 
 struct Clifford
     xz::Array{Bool, 2}
@@ -29,7 +31,8 @@ function size(state::StabState, dim::Int)
     end
 end
 
-const PauliString = Tuple{Int, <:AbstractArray{Bool}}
+# const PauliString = Tuple{Int, <:AbstractArray{Bool}}
+PauliString = Tuple{Int, <:AbstractArray{Bool}}
 
 function all_up(n)
     xz = fill(false, 2n, 2n)
@@ -61,16 +64,16 @@ function random_state(n, n_stab)
     s = zeros(Int, 2n)
     @views for i in 1:n_stab
         xz[i, :] = tmp.xz[2i-1, :]
-        s[i] = tmp.s[2i-1, :]
+        s[i] = tmp.s[2i-1]
         xz[i+n, :] = tmp.xz[2i, :]
-        s[i+n] = tmp.s[2i, :]
+        s[i+n] = tmp.s[2i]
     end
     return StabState(xz, s, n_stab)
 end
 
 
 function *(p1::PauliString, p2::PauliString)
-    n = div(length(p1), 2)
+    n = div(length(p1[2]), 2)
     s1, b1 = p1
     s2, b2 = p2
     s = s1 + s2
@@ -83,6 +86,9 @@ function *(p1::PauliString, p2::PauliString)
 end
 
 
+"""
+xz[i, :] <- xz[j, :]
+"""
 function copy_row!(state, i, j)
     if i==j
         return nothing
@@ -92,7 +98,7 @@ function copy_row!(state, i, j)
     for k in 1:2n
         xz[i, k] = xz[j, k]
     end
-    s[i] = s[k]
+    s[i] = s[j]
     return nothing
 end
 
@@ -104,9 +110,13 @@ function erase_row!(state, i)
         xz[i, k] = false
     end
     s[i] = 0
+    return nothing
 end
 
 
+"""
+xz[i] = xz[i] * xz[j]
+"""
 function single_row_sum!(state, i, j)
     xz, s, n_stab = flat(state)
     m, n = size(state)
@@ -115,6 +125,7 @@ function single_row_sum!(state, i, j)
         xz[i, 2k-1] ⊻= xz[j, 2k-1]
         xz[i, 2k] ⊻= xz[j, 2k]
     end
+    s[i] += s[j]
     s[i] = m4(s[i])
     return nothing
 end
@@ -128,7 +139,7 @@ end
     while !binary_symplectic_inner(xz[i, :], xz[j, :])
         xz[i, :] = rand(Bool, 2n)
     end
-    s[i] = Int(!is_herm(0, xz[i, :]))
+    # s[i] = Int(!is_herm(0, xz[i, :]))
     for k in 1:m
         if k==i || k==j
             continue
@@ -140,13 +151,14 @@ end
             single_row_sum!(state, i, k)
         end
     end
+    s[i] = Int(!is_herm(0, xz[i, :]))
     return nothing
 end
 
 
 """
 xz[i] = xz[i] * xz[j]
-dxz[j] = dxz[i] * dxz[j]
+xz[j+n] = xz[i+n] * xz[j+n]
 """
 function row_sum!(state, i, j)
     m, n = size(state)
@@ -217,8 +229,7 @@ function clifford_action!(clifford, state, positions)
 end
 
 
-
-@views function measurement!(state, observable::PauliString, positions, record=true)
+@views function measurement!(state, observable::PauliString, positions, record=true, forced=false)
     m, n = size(state)
     xz, s, _ = flat(state)
     indices = spin_to_binary_indices(positions)
@@ -244,7 +255,7 @@ end
             xz[i, :] .= false
             s[i] = observable[1]
             xz[i, indices] = observable[2]
-            r = rand(Bool)
+            r = forced ? false : rand(Bool)
             s[i] += 2 * r
             s[i] = m4(s[i])
             return r
@@ -258,7 +269,9 @@ end
             return false
         end
     else
-        tmp = observable
+        b = zeros(Bool, 2n)
+        b[indices] .= observable[2]
+        tmp = observable[1], b
         for i in uc_destab_rows
             tmp = tmp * (s[i], xz[i, :])
         end
@@ -278,11 +291,33 @@ end
             state.n_stab += 1
             s[m] = tmp[1]
             xz[m, indices] = tmp[2]
-            r = rand(Bool)
+            r = forced ? false : rand(Bool)
             s[m] += 2r
             s[m] = m4(s[m])
             row_auto_fill!(state, m+n)
             return r
         end
     end
+end
+
+entropy(state) = size(state, 2) - size(state, 1)
+
+function left_ee_on_all_cuts(state)
+    m, n = size(state)
+    mat = state.xz[1:m, 2n:-1:1]
+    c_rks = binary_all_vertical_cut_ranks(mat)[2n:-2:2]
+    ees = [i==n ? (n-m) : (i - m + c_rks[i+1]) for i in 0:n]
+    return ees
+end
+
+function right_ee_on_all_cuts(state)
+    m, n = size(state)
+    mat = state.xz[1:m, :]
+    c_rks = binary_all_vertical_cut_ranks(mat)[2:2:2n]
+    ees = [i==0 ? (n-m) : (n - i - m + c_rks[i]) for i in 0:n]
+    return ees
+end
+
+function mi_on_all_cuts(state)
+    return left_ee_on_all_cuts(state) + right_ee_on_all_cuts(state) .- entropy(state)
 end
