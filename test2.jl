@@ -123,4 +123,49 @@ function test_auto_fill_row()
 end
 # test_auto_fill_row()
 
+function test_ap_neg()
+    for _ in 1:1000
+        state = random_state(20, 10)
+        a = 4
+        b = 11
+        l = 3
+        tmp1 = ap_negativity(state, a, b, l)
+        tmp2 = [mutual_neg(state, a+1:a+x, b+1:b+x) for x in 1:l]
+        @assert tmp1 == tmp2
+    end
+end
+test_ap_neg()
+
+function test_ap_mi()
+    for _ in 1:1000
+        state = random_state(20, 10)
+        a = 4
+        b = 11
+        l = 3
+        tmp1 = ap_mutual_info(state, a, b, l)
+        tmp2 = [mutual_info(state, a+1:a+x, b+1:b+x) for x in 1:l]
+        @assert tmp1 == tmp2
+    end
+end
+test_ap_mi()
+
+function test_binary_random_symplectic_matrix()
+    for _ in 1:100
+        n = rand(1:5)
+        mat = binary_random_symplectic_matrix(n)
+        for i in 1:n
+            for j in 1:i
+                if i==j
+                    @assert binary_symplectic_inner(mat[2i, :], mat[2j-1, :])
+                else
+                    @assert !binary_symplectic_inner(mat[2i, :], mat[2j-1, :])
+                end
+                @assert !binary_symplectic_inner(mat[2i, :], mat[2j, :])
+                @assert !binary_symplectic_inner(mat[2i-1, :], mat[2j-1, :])
+            end
+        end
+    end
+end
+test_binary_random_symplectic_matrix()
+
 

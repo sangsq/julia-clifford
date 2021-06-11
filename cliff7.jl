@@ -209,9 +209,14 @@ function clifford_action!(clifford, state, positions)
     m, n = size(state)
     xz, s, n_stab = flat(state)
     indices = spin_to_binary_indices(positions)
-    for k in union(1:m, 1+n:m+n)
+    tmp_s = 0
+    tmp_xz = fill(false, 2 * n_act)
+    for k in 1:2n
+        if (m < k <= n) || (n+m < k <= 2n)
+            continue
+        end
         tmp_s = 0
-        tmp_xz = fill(false, 2 * n_act)
+        tmp_xz .= false
         for j in 1:2n_act
             if xz[k, indices[j]]
                 tmp_s += clifford.s[j]
@@ -247,7 +252,10 @@ end
     if !isempty(uc_stab_rows)
         i = uc_stab_rows[1]
         for j in uc_stab_rows[2:end]
-            row_sum!(state, i, j)
+            single_row_sum!(state, j, i)
+        end
+        for j in uc_destab_rows
+            single_row_sum!(state, j+n, i)
         end
         # # case 1.1: recorded, n_stab unchanged
         if record
@@ -289,8 +297,8 @@ end
         else
             m += 1
             state.n_stab += 1
-            s[m] = tmp[1]
-            xz[m, indices] = tmp[2]
+            s[m] = observable[1]
+            xz[m, indices] = observable[2]
             r = forced ? false : rand(Bool)
             s[m] += 2r
             s[m] = m4(s[m])
@@ -320,4 +328,140 @@ end
 
 function mi_on_all_cuts(state)
     return left_ee_on_all_cuts(state) + right_ee_on_all_cuts(state) .- entropy(state)
+end
+
+function mutual_info(state, region1, region2)
+    m, n = size(state)
+    region1 = spin_to_binary_indices(region1)
+    region2 = spin_to_binary_indices(region2)
+    a = binary_rank(@view state.xz[1:m, region1])
+    b = binary_rank(@view state.xz[1:m, region2])
+    c = binary_rank(@view state.xz[1:m, union(region1, region2)])
+    return a + b -c
+end
+
+function mutual_neg(state, region1, region2)
+    m, n = size(state)
+    l1, l2 = length(region1), length(region2)
+    new_idx = cat(region1, region2, setdiff(1:n, union(region1, region2)), dims=1)
+    new_idx = spin_to_binary_indices(new_idx)
+    mat = state.xz[1:m, new_idx]
+    epoints = binary_bidirectional_gaussian!(mat)
+    mask = [i for i in 1:m if epoints[i, 2] <= l1 + l2]
+    mat1 = mat[mask, 1:(l1 + l2)]
+    m = length(mask)
+    K = zeros(Bool, m, m)
+    for i in 1:m
+        for j in 1:i
+            @views K[i, j] = K[j, i] = binary_symplectic_inner(mat1[i, :], mat1[j, :])
+        end
+    end
+    return binary_rank(K)
+end
+
+
+function ap_negativity(state, a, b, l)
+    @assert (a<b) && (a+l<=b)
+    m, n = size(state)
+
+    range_list = [1:2a, 2a+2l+1:2b, 2b+2l+1:2n]
+    mat = fill(false, m, 2n)
+
+    @views for i in 1:l
+        mat[:, 2(2i-1)-1] = state.xz[1:m, 2(a+i)-1]
+        mat[:, 2(2i-1)] = state.xz[1:m, 2(a+i)]
+
+        mat[:, 2(2i)-1] = state.xz[1:m, 2(b+i)-1]
+        mat[:, 2(2i)] = state.xz[1:m, 2(b+i)]
+    end
+
+    i = 4l
+    @views for rg in range_list
+        len = length(rg)
+        if len>0
+            mat[:, i+1:i+len] = state.xz[1:m, rg]
+        end
+        i += len
+    end
+
+    end_points = binary_bidirectional_gaussian!(mat)
+
+    tmp = [(i, end_points[i, 2]) for i in 1:m if end_points[i, 2] <= 4l]
+    sort!(tmp, by= x->x[2])
+    new_order = Int[a[1] for a in tmp]
+    end_points2 = end_points[new_order, :]
+    m = length(new_order)
+
+    mask_A = [0<i%4<3 for i in 1:4l]
+    mat_A = mat[new_order, 1:4l][:, mask_A]
+
+    gk = fill(m, 2l)
+    j = 1
+    for i in 1:m
+        k = end_points2[i, 2]
+        spin_k = div(k+1, 2)
+        gk[j:spin_k-1] .= i-1
+        j = spin_k
+    end
+
+    K = zeros(Bool, m, m)
+    for i in 1:m
+        for j in 1:i
+            @views K[i, j] = K[j, i] = binary_symplectic_inner(mat_A[i, :], mat_A[j, :])
+        end
+    end
+    rank_K = binary_all_diagonal_ranks(K)
+    ngs = [gk[2r]==0 ? 0 : rank_K[gk[2r]] for r in 1:l]
+    return ngs
+end
+
+
+@views function ap_mutual_info(state, a, b, l)
+    m, n = size(state)
+    mat = fill(false, m, 4l)
+
+    for i in 1:l
+        mat[:, 2(2i-1)-1] = state.xz[1:m, 2(a+i)-1]
+        mat[:, 2(2i-1)] = state.xz[1:m, 2(a+i)]
+
+        mat[:, 2(2i)-1] = state.xz[1:m, 2(b+i)-1]
+        mat[:, 2(2i)] = state.xz[1:m, 2(b+i)]
+    end
+
+    mat_AB = mat
+    mask = Bool[0<i%4<3 for i in 1:4l]
+    mat_A = mat_AB[:, mask]
+    mat_B = mat_AB[:, .!mask]
+
+    rk_AB = binary_all_vertical_cut_ranks!(mat_AB)[2:2:end]
+    rk_A = binary_all_vertical_cut_ranks!(mat_A)[2:2:end]
+    rk_B = binary_all_vertical_cut_ranks!(mat_B)[2:2:end]
+
+    mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in 1:l]
+    
+    return mis
+end
+
+
+function end_points(state)
+    m, n = size(state)
+    mat = state.xz[1:m, :]
+    end_points = binary_bidirectional_gaussian!(mat)
+    return end_points
+end
+
+
+
+@everywhere function get_mix_gate(p)
+    function gate(state, i, j)
+        @assert size(state,1) == size(state, 2)
+        _, n = size(state)
+        if rand() < p
+            z_meas!(state, i)
+        else
+            xx_meas!(state, i, j)
+        end
+        return nothing
+    end
+    return gate
 end

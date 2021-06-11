@@ -205,63 +205,27 @@ function binary_symplectic_inner(x, y)
 end
 
 @views function binary_random_symplectic_matrix(n)
-    b_mat = diagm([true for _ in 1:2n])
-    rand_idx = [true for _ in 1:2n]
-    x_img = zeros(Bool, 2n)
-    z_img = zeros(Bool, 2n)
-
-    for i in 1:n
-
+    b_mat = rand(Bool, 2n, 2n)
+    for i in 1:2n
         while true
-            x_img .= false
-            rand!(rand_idx)
-            for j in 2i-1 : 2n
-                if rand_idx[j]
+            rand!(b_mat[i, :])
+            if iseven(i) && !binary_symplectic_inner(b_mat[i, :], b_mat[i-1, :])
+                continue
+            end
+            for j in 1:(isodd(i) ? i-1 : i-2)
+                if binary_symplectic_inner(b_mat[i, :], b_mat[j, :])
+                    k = isodd(j) ? j+1 : j-1
                     for l in 1:2n
-                        x_img[l] = b_mat[l, j] ⊻ x_img[l]
+                        b_mat[i, l] = b_mat[i, l] ⊻ b_mat[k, l]
                     end
                 end
             end
-            any(x_img) && break
-        end
-        
-        while true
-            z_img .= false
-            rand!(rand_idx)
-            for j in 2i-1 : 2n
-                if rand_idx[j]
-                    for l in 1:2n
-                        z_img[l] = b_mat[l, j] ⊻ x_img[l]
-                    end
-                end
+            if all(.!b_mat[i, :])
+                continue
             end
-            any(x_img) && binary_symplectic_inner(x_img, z_img) && break
+            break
         end
-
-        if i<n
-            x_bad_idx = [j for j in 2i-1:2n if binary_symplectic_inner(x_img, b_mat[:, j])]
-            piv = x_bad_idx[1]
-            for k in x_bad_idx[2:end]
-                for l in 1:2n
-                    b_mat[l, k] = b_mat[l, piv] ⊻ b_mat[l, k]
-                end
-            end
-            b_mat[:, piv]= b_mat[:, 2i-1]
-
-            z_bad_idx = [j for j in 2i:2n if binary_symplectic_inner(z_img, b_mat[:, j])]     
-            piv = z_bad_idx[1]
-            for k in z_bad_idx[2:end]
-                for l in 1:2n
-                    b_mat[l, k] = b_mat[l, piv] ⊻ b_mat[l, k]
-                end
-            end
-            b_mat[:, piv] = b_mat[:, 2i]
-        end
-
-        b_mat[:, 2i-1] = x_img
-        b_mat[:, 2i] = z_img
     end
-    
     return b_mat
 end
 
