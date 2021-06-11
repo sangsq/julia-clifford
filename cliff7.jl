@@ -449,19 +449,3 @@ function end_points(state)
     end_points = binary_bidirectional_gaussian!(mat)
     return end_points
 end
-
-
-
-@everywhere function get_mix_gate(p)
-    function gate(state, i, j)
-        @assert size(state,1) == size(state, 2)
-        _, n = size(state)
-        if rand() < p
-            z_meas!(state, i)
-        else
-            xx_meas!(state, i, j)
-        end
-        return nothing
-    end
-    return gate
-end
