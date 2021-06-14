@@ -134,7 +134,7 @@ function test_ap_neg()
         @assert tmp1 == tmp2
     end
 end
-test_ap_neg()
+# test_ap_neg()
 
 function test_ap_mi()
     for _ in 1:1000
@@ -147,7 +147,7 @@ function test_ap_mi()
         @assert tmp1 == tmp2
     end
 end
-test_ap_mi()
+# test_ap_mi()
 
 function test_binary_random_symplectic_matrix()
     for _ in 1:100
@@ -166,6 +166,21 @@ function test_binary_random_symplectic_matrix()
         end
     end
 end
-test_binary_random_symplectic_matrix()
+# test_binary_random_symplectic_matrix()
 
+function test_measurement()
+    Random.seed!(1)
+    for i in 1:100
+        n = 8
+        m = rand(1:n)
+        state = random_state(n, m)
+        ob = (0, Bool[0, 1])
+        a = measurement!(state, ob, [1])
+        ss = copy(state)
+        b = measurement!(ss, ob, [1])
+        same_state(ss, state)
+        @assert a==b
 
+    end
+end
+test_measurement()

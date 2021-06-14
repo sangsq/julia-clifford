@@ -1,5 +1,6 @@
 using Random
 using LinearAlgebra
+using Statistics
 import Base:show, *, length, iterate, size, copy
 
 include("binary_linalg.jl")
@@ -137,9 +138,8 @@ end
     j = i>n ? i-n : i+n
 
     while !binary_symplectic_inner(xz[i, :], xz[j, :])
-        xz[i, :] = rand(Bool, 2n)
+        rand!(xz[i, :])
     end
-    # s[i] = Int(!is_herm(0, xz[i, :]))
     for k in 1:m
         if k==i || k==j
             continue
@@ -297,8 +297,8 @@ end
         else
             m += 1
             state.n_stab += 1
-            s[m] = observable[1]
-            xz[m, indices] = observable[2]
+            s[m] = tmp[1]
+            xz[m, :] = tmp[2]
             r = forced ? false : rand(Bool)
             s[m] += 2r
             s[m] = m4(s[m])
@@ -448,4 +448,10 @@ function end_points(state)
     mat = state.xz[1:m, :]
     end_points = binary_bidirectional_gaussian!(mat)
     return end_points
+end
+
+
+function mean_stab_length(state)
+    ep = end_points(state)
+    return mean(ep[:, 2] - ep[:, 1])
 end
