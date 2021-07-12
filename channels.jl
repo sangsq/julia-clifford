@@ -9,23 +9,23 @@ function row_reduce_a_site!(state, i)
     fx, fy, fz = 0, 0, 0
     for j in 1:m
         if xz[j, 2i-1]==true && xz[j, 2i]==false
-            fx == 0 ? fx = j : row_sum!(state, j, fx)
+            fx == 0 ? fx = j : double_row_sum!(state, j, fx)
         elseif xz[j, 2i-1]==false && xz[j, 2i]==true
-            fz == 0 ? fz = j : row_sum!(state, j, fz)
+            fz == 0 ? fz = j : double_row_sum!(state, j, fz)
         elseif xz[j, 2i-1]==true && xz[j, 2i]==true
-            fy == 0 ? fy = j : row_sum!(state, j, fy)
+            fy == 0 ? fy = j : double_row_sum!(state, j, fy)
         end
     end
     if fy != 0
         if (fx != 0) && (fz != 0)
-            row_sum!(state, fy, fx)
-            row_sum!(state, fy, fz)
+            double_row_sum!(state, fy, fx)
+            double_row_sum!(state, fy, fz)
             fy = 0
         elseif (fx != 0) && (fz == 0)
-            row_sum!(state, fy, fx)
+            double_row_sum!(state, fy, fx)
             fz, fy = fy, 0
         elseif (fx == 0) && (fz != 0)
-            row_sum!(state, fy, fz)
+            double_row_sum!(state, fy, fz)
             fx, fy = fy, 0
         end
     end

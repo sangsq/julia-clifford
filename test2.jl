@@ -61,7 +61,7 @@ function test2()
         if i==j
             continue
         end
-        row_sum!(state, i, j)
+        double_row_sum!(state, i, j)
         test_state(state)
     end
 end
@@ -79,7 +79,7 @@ function test_same_state()
             while j==i
                 j = rand(1:m)
             end
-            row_sum!(state1, i, j)
+            double_row_sum!(state1, i, j)
         end
         same_state(state1, state)
     end
