@@ -124,10 +124,10 @@ end
 # test_auto_fill_row()
 
 function test_ap_neg()
-    for _ in 1:1000
-        state = random_state(20, 10)
-        a = 4
-        b = 11
+    for _ in 1:10000
+        state = random_state(10, 10)
+        a = 1
+        b = 6
         l = 3
         tmp1 = ap_negativity(state, a, b, l)
         tmp2 = [mutual_neg(state, a+1:a+x, b+1:b+x) for x in 1:l]
@@ -183,4 +183,4 @@ function test_measurement()
 
     end
 end
-test_measurement()
+# test_measurement()

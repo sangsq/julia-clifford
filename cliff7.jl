@@ -118,7 +118,7 @@ end
 """
 xz[i] = xz[i] * xz[j]
 """
-function single_row_sum!(state, i, j)
+function row_sum!(state, i, j)
     xz, s, n_stab = flat(state)
     m, n = size(state)
     for k in 1:n
@@ -145,10 +145,10 @@ end
             continue
         end
         if binary_symplectic_inner(xz[i, :], xz[k, :])
-            single_row_sum!(state, i, k+n)
+            row_sum!(state, i, k+n)
         end
         if binary_symplectic_inner(xz[i, :], xz[k+n, :])
-            single_row_sum!(state, i, k)
+            row_sum!(state, i, k)
         end
     end
     s[i] = Int(!is_herm(0, xz[i, :]))
@@ -160,10 +160,10 @@ end
 xz[i] = xz[i] * xz[j]
 xz[j+n] = xz[i+n] * xz[j+n]
 """
-function row_sum!(state, i, j)
+function double_row_sum!(state, i, j)
     m, n = size(state)
-    single_row_sum!(state, i, j)
-    single_row_sum!(state, j+n, i+n)
+    row_sum!(state, i, j)
+    row_sum!(state, j+n, i+n)
     return nothing
 end
 
@@ -234,6 +234,38 @@ function clifford_action!(clifford, state, positions)
 end
 
 
+"""
+forced measurement on pure state
+"""
+function fps_measurement!(state, observable::PauliString, positions)
+    m, n = size(state)
+    @assert m==n
+    indices = spin_to_binary_indices(positions)
+    tmp = 0
+    for k in 1:n
+        if binary_symplectic_inner(observable[2], xz[k, indices])
+            if tmp == 0
+                tmp = k
+            else
+                row_sum!(state, k, tmp)
+            end
+        end
+    end
+    if tmp != 0
+        for k in n+1:2n
+            if binary_symplectic_inner(observable[2], xz[k, indices])
+                row_sum!(state, k, tmp)
+            end
+        end
+        copy_row!(state, tmp + n, tmp)
+        erase_row!(state, tmp)
+        s[tmp] = observable[1]
+        xz[tmp, indices] .= observable[2]
+    end
+    return false
+end
+
+
 @views function measurement!(state, observable::PauliString, positions, record=true, forced=false)
     m, n = size(state)
     xz, s, _ = flat(state)
@@ -252,10 +284,10 @@ end
     if !isempty(uc_stab_rows)
         i = uc_stab_rows[1]
         for j in uc_stab_rows[2:end]
-            single_row_sum!(state, j, i)
+            row_sum!(state, j, i)
         end
         for j in uc_destab_rows
-            single_row_sum!(state, j+n, i)
+            row_sum!(state, j+n, i)
         end
         # # case 1.1: recorded, n_stab unchanged
         if record
@@ -347,8 +379,8 @@ function mutual_neg(state, region1, region2)
     new_idx = spin_to_binary_indices(new_idx)
     mat = state.xz[1:m, new_idx]
     epoints = binary_bidirectional_gaussian!(mat)
-    mask = [i for i in 1:m if epoints[i, 2] <= l1 + l2]
-    mat1 = mat[mask, 1:(l1 + l2)]
+    mask = [i for i in 1:m if epoints[i, 2] <= 2(l1 + l2)]
+    mat1 = @views mat[mask, 1:2l1]
     m = length(mask)
     K = zeros(Bool, m, m)
     for i in 1:m
@@ -356,7 +388,7 @@ function mutual_neg(state, region1, region2)
             @views K[i, j] = K[j, i] = binary_symplectic_inner(mat1[i, :], mat1[j, :])
         end
     end
-    return binary_rank(K)
+    return div(binary_rank(K), 2)
 end
 
 
@@ -411,7 +443,7 @@ function ap_negativity(state, a, b, l)
         end
     end
     rank_K = binary_all_diagonal_ranks(K)
-    ngs = [gk[2r]==0 ? 0 : rank_K[gk[2r]] for r in 1:l]
+    ngs = [gk[2r]==0 ? 0 : div(rank_K[gk[2r]], 2) for r in 1:l]
     return ngs
 end
 
@@ -440,18 +472,4 @@ end
     mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in 1:l]
     
     return mis
-end
-
-
-function end_points(state)
-    m, n = size(state)
-    mat = state.xz[1:m, :]
-    end_points = binary_bidirectional_gaussian!(mat)
-    return end_points
-end
-
-
-function mean_stab_length(state)
-    ep = end_points(state)
-    return mean(ep[:, 2] - ep[:, 1])
 end

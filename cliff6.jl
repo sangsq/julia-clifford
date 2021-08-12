@@ -1,359 +1,350 @@
 using Random
-using Profile
 using LinearAlgebra
-import Base:show, *, length, iterate
+using Statistics
+import Base:show, *, length, iterate, size, copy
 
 include("binary_linalg.jl")
 
 mutable struct StabState
-    xz::Array{Bool, 2}
-    s::Array{Int, 1}
+    xz::Array{Bool, 2} # (n, 2n) shape, on each site 10->X, 01->Z, 11->XZ
+    s::Array{Int, 1} # shape (n,), {0, 1, 2, 3} -> {1, i, -1, -i}
+    n_stab::Int # number of stablizer for the state
 end
+
+copy(state::StabState) = StabState(copy(state.xz), copy(state.s), state.n_stab)
 
 struct Clifford
     xz::Array{Bool, 2}
     s::Array{Int, 1}
 end
 
-const PauliString = Tuple{Int, <:AbstractArray{Bool}}
+flat(state::StabState) = state.xz, state.s, state.n_stab
+m4(x) = mod(x, 4)
+
+size(state::StabState) = state.n_stab, div(size(state.xz, 2), 2)
+function size(state::StabState, dim::Int)
+    @assert dim == 1 || dim == 2
+    if dim==1
+        return state.n_stab
+    else
+        return div(size(state.xz, 2), 2)
+    end
+end
+
+# const PauliString = Tuple{Int, <:AbstractArray{Bool}}
+PauliString = Tuple{Int, <:AbstractArray{Bool}}
 
 function all_up(n)
     xz = fill(false, n, 2n)
     for i in 1:n
         xz[i, 2i] = true
     end
-    s = fill(false, n)
-    return StabState(xz, s)
+    s = fill(0, n)
+    n_stab = n
+    return StabState(xz, s, n_stab)
 end
+
 
 function all_plus(n)
     xz = fill(false, n, 2n)
     for i in 1:n
         xz[i, 2i-1] = true
     end
-    s = fill(false, n)
-    return StabState(xz, s)
+    s = fill(0, n)
+    n_stab = n
+    return StabState(xz, s, n_stab)
 end
 
-function *(x::PauliString, y::PauliString)
-    sx, bx = x
-    sy, by = y
-    s = sx + sy
-    for i in 1:2:length(bx)
-        s += 2 * xor(bx[i+1] * by[i])
+
+function random_state(n, n_stab)
+    tmp = random_clifford(n)
+    xz = zeros(Bool, n, 2n)
+    s = zeros(Int, n)
+    @views for i in 1:n_stab
+        xz[i, :] = tmp.xz[2i-1, :]
+        s[i] = tmp.s[2i-1]
     end
-    s = s % 4
-    b = Bool[xor(bx[i], by[i]) for i in 1:length(bx)]
+    return StabState(xz, s, n_stab)
+end
+
+
+function *(p1::PauliString, p2::PauliString)
+    n = div(length(p1[2]), 2)
+    s1, b1 = p1
+    s2, b2 = p2
+    s = s1 + s2
+    for i in 1:n
+        s += 2 * (b1[2i] && b2[2i-1])
+    end
+    s = m4(s)
+    b = Bool[xor(b1[i], b2[i]) for i in 1:2n]
     return s, b
 end
 
-function spin_to_binary_indices(spin_indices)
-    n = length(spin_indices)
-    indices = fill(0, 2 * n)
-    for i in 1:n
-        indices[2i-1] = 2 * spin_indices[i] - 1
-        indices[2i] = 2 * spin_indices[i]
+
+"""
+xz[i, :] <- xz[j, :]
+"""
+function copy_row!(state, i, j)
+    if i==j
+        return nothing
     end
-    return indices
+    xz, s, n_stab = flat(state)
+    m, n = size(state)
+    for k in 1:2n
+        xz[i, k] = xz[j, k]
+    end
+    s[i] = s[j]
+    return nothing
 end
 
-function row_sum(state, i, j)
-    ps1 = state.s[i], @view state.xz[i, :]
-    ps2 = state.s[j], @view state.xz[j, :]
-    r = ps1 * ps2
-    state.s[i], state.xz[i, :] = r
+
+function erase_row!(state, i)
+    xz, s, n_stab = flat(state)
+    m, n = size(state)
+    for k in 1:2n
+        xz[i, k] = false
+    end
+    s[i] = 0
+    return nothing
 end
 
 
-commute(x1::Bool, z1::Bool, x1::Bool, z2::Bool) = !xor(x1 * z2, x2 * z1)
-commute(x, y) = !binary_symplectic_inner(x, y)
+"""
+xz[i] = xz[i] * xz[j]
+"""
+function row_sum!(state, i, j)
+    xz, s, n_stab = flat(state)
+    m, n = size(state)
+    for k in 1:n
+        s[i] += 2 * (xz[i, 2k] * xz[j, 2k-1])
+        xz[i, 2k-1] ⊻= xz[j, 2k-1]
+        xz[i, 2k] ⊻= xz[j, 2k]
+    end
+    s[i] += s[j]
+    s[i] = m4(s[i])
+    return nothing
+end
+
+
+# commute(x1::Bool, z1::Bool, x2::Bool, z2::Bool) = !xor(x1 * z2, x2 * z1)
+# commute(x, y) = !binary_symplectic_inner(x, y)
 
 
 function is_herm(s, xz)
     r = false
-    for i in 1:2:length(xz)
-        r = xor(r, xz[i] * xz[i+1])
+    for k in 1:2:length(xz)
+        r ⊻= xz[k] * xz[k+1]
     end
-    return xor(isodd(s), r)
+    return !xor(isodd(s), r)
 end
 
 
 function random_clifford(n)
     xz = binary_random_symplectic_matrix(n)
     s = fill(0, 2n)
-    for i in 1:2n
-        h = is_herm(0, view(xz, i, :))
-        s[i] = (2 * rand(Bool) + h) % 4
+    for k in 1:2n
+        h = is_herm(0, view(xz, k, :))
+        s[k] = m4(2 * rand(Bool) + !h)
     end
     return Clifford(xz, s)
+end
+
+
+function spin_to_binary_indices(spin_indices)
+    n = length(spin_indices)
+    indices = fill(0, 2 * n)
+    for k in 1:n
+        indices[2k-1] = 2 * spin_indices[k] - 1
+        indices[2k] = 2 * spin_indices[k]
+    end
+    return indices
 end
 
 
 function clifford_action!(clifford, state, positions)
     n_act = length(positions)
     @assert size(clifford.xz, 1) == n_act * 2
-    m, n = size(state.xz)
+    m, n = size(state)
+    xz, s, n_stab = flat(state)
     indices = spin_to_binary_indices(positions)
-    for i in 1:m
-        tmp = 0, fill(false, 2 * n_act)
-        for j in indices
-            if state.xz[i, j]
-                s = clifford.s[j]
-                xz = clifford.xz[j, :]    
-                tmp = tmp * (s, xz)
+    tmp_s = 0
+    tmp_xz = fill(false, 2 * n_act)
+    for k in 1:m
+        tmp_s = 0
+        tmp_xz .= false
+        for j in 1:2n_act
+            if xz[k, indices[j]]
+                tmp_s += clifford.s[j]
+                for k in 1:n_act
+                    tmp_s += 2 * (tmp_xz[2k] * clifford.xz[j, 2k-1])
+                    tmp_xz[2k-1] ⊻= clifford.xz[j, 2k-1]
+                    tmp_xz[2k] ⊻= clifford.xz[j, 2k]
+                end
             end
         end
-        state.s[i] = (tmp[1] + state.s[i]) % 4
-        for j in indices
-            state.xz[i, j] = tmp[2][j]
+        s[k] = m4(tmp_s + s[k])
+        xz[k, indices] = tmp_xz
+    end
+    return nothing
+end
+
+
+"""
+forced measurement on pure state
+"""
+function fps_measurement!(state, observable::PauliString, positions)
+    m, n = size(state)
+    s, xz = state.s, state.xz
+    @assert m==n
+    indices = spin_to_binary_indices(positions)
+    tmp = 0
+    for k in 1:n
+        if binary_symplectic_inner(observable[2], xz[k, indices])
+            if tmp == 0
+                tmp = k
+            else
+                row_sum!(state, k, tmp)
+            end
         end
     end
-end
-
-
-function sub_area_xz(state, sub_area)
-    b_sub_area = spin_to_binary_indices(sub_area)
-    m, n = size(state.xz)
-    l = size(s_sub_area, 1)
-    m = transpose(state.xz)
-    m = cat(m, zeros(Bool, (n, l)), dims=2)
-    m[binary_sub_area, m + 1 : m + l] += I
-    null_space = binary_null_space(m)[m + 1: m + l, :]
-    sub_xz = transpose(null_space)
-    return sub_xz
-end
-
-
-function measurement!(state, observable, positions)
-    m = size(state.xz, 1)
-    b_positions = spin_to_binary_indices(positions)
-    uncommute_rows = [i for i in 1:m if !commute(observable, @view state[i, b_positions])]
-    if isempty(uncommute_rows)
-        return state
+    if tmp != 0
+        erase_row!(state, tmp)
+        s[tmp] = observable[1]
+        xz[tmp, indices] .= observable[2]
     end
-    for row in uncommute_rows[2:end]
-        row_sum(state, row, uncommute_rows[1])
-    end
-    row = uncommute_rows[1]
-    state.xz[row, :] .= false
-    state.s[row] = 2 * rand(Bool) + is_herm(0, observable)
-    return state
+    return false
 end
 
-# function negativity(state, sub_area)
-#     return binary_rank(sign_mat(state[:, sub_area]))
-# end
 
-# rk(state) = binary_rank(to_binary_matrix(state))
-
-# function entropy(state)
-#     M, N = size(state)
-#     return N - M
-# end
-
-# function bipartite_entropy(state, sub_area)
-#     M, N = size(state)
-#     sub_size = length(sub_area)
-#     sub_area_c = setdiff(1:N, sub_area)
-
-#     c_rk = rk(state[:, sub_area_c])
-#     return sub_size - M + c_rk
-# end
-
-
-# function pure_state_bipartite_entropy(state, sub_area)
-#     # Make use of the fact that for pure state S_A = S_B
-#     M, N = size(state)
-#     sub_size = length(sub_area)
-#     sub_area_c = setdiff(1:N, sub_area)
-
-#     if sub_size < div(N, 2)
-#         sub_area, sub_area_c = sub_area_c, sub_area
-#         sub_size = N - sub_size
-#     end
-
-#     c_rk = rk(state[:, sub_area_c])
-#     ee = sub_size - M + c_rk
-
-#     return ee
-# end
-
-function pure_ee_across_all_cuts(state, cut_point)
+function left_ee_on_all_cuts(state)
     m, n = size(state)
-    mat = state.xz[:, 1:2cut_point]
-    ees = Array(-1:-1:-cut_point)
-    pivs, _ = binary_uppertrianglize!(mat)
-
-    rho_left = zeros(Int, n)
-    for b_piv in pivs
-        piv = div(b_piv + 1, 2)
-        rho_left[piv] += 1
-    end
-
-    current_sum = 0
-    for i in 1:cut_point
-        current_sum += rho_left[i]
-        ees[i] += current_sum
-    end
-
+    mat = state.xz[1:m, 2n:-1:1]
+    c_rks = binary_all_vertical_cut_ranks(mat)[2n:-2:2]
+    ees = [i==n ? (n-m) : (i - m + c_rks[i+1]) for i in 0:n]
     return ees
 end
 
+function right_ee_on_all_cuts(state)
+    m, n = size(state)
+    mat = state.xz[1:m, :]
+    c_rks = binary_all_vertical_cut_ranks(mat)[2:2:2n]
+    ees = [i==0 ? (n-m) : (n - i - m + c_rks[i]) for i in 0:n]
+    return ees
+end
 
-# function two_point_correlation_square(state, i, j, connected=true, d_i=Z, d_j=Z)
-#     M, N = size(state)
-#     a = [commute(p, d_i) for p in state[:, i]]
-#     b = [commute(p, d_j) for p in state[:, j]]
-#     tmp = [true for _ in 1:M]
-#     result = Int(a == b) - Int(a == b == tmp) * Int(connected)
-#     return result
-# end
+function mi_on_all_cuts(state)
+    return left_ee_on_all_cuts(state) + right_ee_on_all_cuts(state) .- entropy(state)
+end
+
+function mutual_info(state, region1, region2)
+    m, n = size(state)
+    region1 = spin_to_binary_indices(region1)
+    region2 = spin_to_binary_indices(region2)
+    a = binary_rank(@view state.xz[1:m, region1])
+    b = binary_rank(@view state.xz[1:m, region2])
+    c = binary_rank(@view state.xz[1:m, union(region1, region2)])
+    return a + b -c
+end
+
+function mutual_neg(state, region1, region2)
+    m, n = size(state)
+    l1, l2 = length(region1), length(region2)
+    new_idx = cat(region1, region2, setdiff(1:n, union(region1, region2)), dims=1)
+    new_idx = spin_to_binary_indices(new_idx)
+    mat = state.xz[1:m, new_idx]
+    epoints = binary_bidirectional_gaussian!(mat)
+    mask = [i for i in 1:m if epoints[i, 2] <= 2(l1 + l2)]
+    mat1 = @views mat[mask, 1:2l1]
+    m = length(mask)
+    K = zeros(Bool, m, m)
+    for i in 1:m
+        for j in 1:i
+            @views K[i, j] = K[j, i] = binary_symplectic_inner(mat1[i, :], mat1[j, :])
+        end
+    end
+    return div(binary_rank(K), 2)
+end
 
 
-# function two_point_mutual_info(state, i, j)
-#     M_AB = view(state, :, [i, j])
-#     M_A = view(state, :, [i])
-#     M_B = view(state, :, [j])
-#     r_A, r_B, r_AB = rk(M_A), rk(M_B), rk(M_AB)
-#     return r_A + r_B - r_AB
-# end
+function ap_negativity(state, a, b, l)
+    @assert (a<b) && (a+l<=b)
+    m, n = size(state)
+
+    range_list = [1:2a, 2a+2l+1:2b, 2b+2l+1:2n]
+    mat = fill(false, m, 2n)
+
+    @views for i in 1:l
+        mat[:, 2(2i-1)-1] = state.xz[1:m, 2(a+i)-1]
+        mat[:, 2(2i-1)] = state.xz[1:m, 2(a+i)]
+
+        mat[:, 2(2i)-1] = state.xz[1:m, 2(b+i)-1]
+        mat[:, 2(2i)] = state.xz[1:m, 2(b+i)]
+    end
+
+    i = 4l
+    @views for rg in range_list
+        len = length(rg)
+        if len>0
+            mat[:, i+1:i+len] = state.xz[1:m, rg]
+        end
+        i += len
+    end
+
+    end_points = binary_bidirectional_gaussian!(mat)
+
+    tmp = [(i, end_points[i, 2]) for i in 1:m if end_points[i, 2] <= 4l]
+    sort!(tmp, by= x->x[2])
+    new_order = Int[a[1] for a in tmp]
+    end_points2 = end_points[new_order, :]
+    m = length(new_order)
+
+    mask_A = [0<i%4<3 for i in 1:4l]
+    mat_A = mat[new_order, 1:4l][:, mask_A]
+
+    gk = fill(m, 2l)
+    j = 1
+    for i in 1:m
+        k = end_points2[i, 2]
+        spin_k = div(k+1, 2)
+        gk[j:spin_k-1] .= i-1
+        j = spin_k
+    end
+
+    K = zeros(Bool, m, m)
+    for i in 1:m
+        for j in 1:i
+            @views K[i, j] = K[j, i] = binary_symplectic_inner(mat_A[i, :], mat_A[j, :])
+        end
+    end
+    rank_K = binary_all_diagonal_ranks(K)
+    ngs = [gk[2r]==0 ? 0 : div(rank_K[gk[2r]], 2) for r in 1:l]
+    return ngs
+end
 
 
-# function mutual_info(state, regionA, regionB)
-#     M_AB = view(state, :, union(regionA, regionB))
-#     M_A = view(state, :, regionA)
-#     M_B = view(state, :, regionB)
-#     r_A, r_B, r_AB = rk(M_A), rk(M_B), rk(M_AB)
-#     return r_A + r_B - r_AB
-# end
+@views function ap_mutual_info(state, a, b, l)
+    m, n = size(state)
+    mat = fill(false, m, 4l)
 
+    for i in 1:l
+        mat[:, 2(2i-1)-1] = state.xz[1:m, 2(a+i)-1]
+        mat[:, 2(2i-1)] = state.xz[1:m, 2(a+i)]
 
-# function mutual_neg(state, A, B)
-#     sub_state = sub_area_state(state, union(A, B))
-#     mn = negativity(sub_state, 1:length(A))
-#     return mn
-# end
+        mat[:, 2(2i)-1] = state.xz[1:m, 2(b+i)-1]
+        mat[:, 2(2i)] = state.xz[1:m, 2(b+i)]
+    end
 
+    mat_AB = mat
+    mask = Bool[0<i%4<3 for i in 1:4l]
+    mat_A = mat_AB[:, mask]
+    mat_B = mat_AB[:, .!mask]
 
+    rk_AB = binary_all_vertical_cut_ranks!(mat_AB)[2:2:end]
+    rk_A = binary_all_vertical_cut_ranks!(mat_A)[2:2:end]
+    rk_B = binary_all_vertical_cut_ranks!(mat_B)[2:2:end]
 
-
-# function antipodal_negativity(state, rd_list)
-#     state = copy(state)
-#     n = size(state, 1)
-#     mid = div(n, 2)
-#     state[:, 1:2:end], state[:, 2:2:end] = state[:, 1:mid], state[:, (mid+1):end]
+    mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in 1:l]
     
-#     mat = to_binary_matrix(state)
-#     end_points = binary_bidirectional_gaussian!(mat)
-#     tmp = [(i, end_points[i, 2]) for i in 1:n]
-#     sort!(tmp, by= x-> x[2])
-#     new_order = [a[1] for a in tmp]
-#     mat, end_points = mat[new_order, :], end_points[new_order, :]
-
-#     mask_A = [0<i%4<3 for i in 1:2n]
-#     mat_A = mat[:, mask_A]
-
-#     gk = [n for _ in 1:n]
-#     j = 1
-#     for i in 1:n
-#         k = end_points[i, 2]
-#         spin_k = div(k+1, 2)
-#         gk[j:spin_k-1] .= i-1
-#         j = spin_k
-#     end
-
-#     K = zeros(Bool, n, n)
-#     for i in 1:n
-#         for j in 1:i
-#             K[i, j] = K[j, i] = binary_symplectic_inner(mat_A[i, :], mat_A[j, :])
-#         end
-#     end
-#     rank_K = binary_all_diagonal_ranks(K)
-#     # ngs = [binary_rank(K[1:gk[2r], 1:gk[2r]]) for r in rd_list]
-#     ngs = [gk[2r]==0 ? 0 : rank_K[gk[2r]] for r in rd_list]
-#     return ngs
-# end
-
-# function antipodal_mutual_info(state, rd_list)
-#     state = copy(state)
-#     n = size(state, 1)
-#     mid = div(n, 2)
-#     state[:, 1:2:end], state[:, 2:2:end] = state[:, 1:mid], state[:, (mid+1):end]
-    
-#     mat_AB = to_binary_matrix(state)
-#     mask = [0<i%4<3 for i in 1:2n]
-#     mat_A = mat_AB[:, mask]
-#     mat_B = mat_AB[:, .!mask]
-
-#     end_points_AB = binary_bidirectional_gaussian!(mat_AB)
-#     end_points_A = binary_bidirectional_gaussian!(mat_A)
-#     end_points_B = binary_bidirectional_gaussian!(mat_B)
-
-#     rk_AB = [0 for _ in 1:n]
-#     j = 1  
-#     for i in 1:n
-#         k = end_points_AB[i, 1]
-#         if k==0
-#             rk_AB[j:end] .= i-1
-#             break
-#         end
-#         spin_k = div(k+1, 2)
-#         rk_AB[j:spin_k-1] .= i-1
-#         j = spin_k
-#         (i==n) && (rk_AB[j:end] .= n)
-#     end
-
-#     rk_A = [0 for _ in 1:div(n,2)]
-#     j = 1
-#     for i in 1:n
-#         k = end_points_A[i, 1]
-#         if k==0
-#             rk_A[j:end] .= i-1
-#             break
-#         end
-#         spin_k = div(k+1, 2)
-#         rk_A[j:spin_k-1] .= i-1
-#         j = spin_k
-#         (i==n) && (rk_A[j:end] .= n)
-#     end
-
-#     rk_B = [0 for _ in 1:div(n,2)]
-#     j = 1
-#     for i in 1:n
-#         k = end_points_B[i, 1]
-#         if k==0
-#             rk_B[j:end] .= i-1
-#             break
-#         end
-#         spin_k = div(k+1, 2)
-#         rk_B[j:spin_k-1] .= i-1
-#         j = spin_k
-#         (i==n) && (rk_B[j:end] .= n)
-#     end
-
-#     mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in rd_list]
-    
-#     return mis
-# end
-
-
-# function several_mutual_info(state, a, rd_list_a, b, rd_list_b)
-#     n = size(state, 1)
-#     result = zeros(Int, length(rd_list_a),  length(rd_list_b))
-#     bmat = to_binary_matrix(state)
-#     mat_B = bmat[:, 2b+1:2b+2rd_list_b[end]]
-#     rk_B = binary_all_vertical_cut_ranks!(mat_B)[2:2:end]
-
-#     for i in 1:length(rd_list_a)
-#         ra = rd_list_a[i]
-#         mat_A = bmat[:, 2a+1:2a+2ra]
-#         mat_AB = bmat[:, union(2a+1:2a+2ra, 2b+1:2b+2rd_list_b[end])] 
-#         rk_A = binary_rank(mat_A)
-#         rk_AB = binary_all_vertical_cut_ranks!(mat_AB)[2:2:end]
-#         result[i, :] = [rk_A + rk_B[l] - rk_AB[ra+l] for l in rd_list_b]
-#     end
-
-#     return result
-# end
-
-
+    return mis
+end
