@@ -191,16 +191,6 @@ function random_clifford(n)
     return Clifford(xz, s)
 end
 
-function random_cc_clifford(n)
-    xz = binary_charge_conserving_symplectic_mat(n)
-    s = fill(0, 2n)
-    for k in 1:2n
-        h = is_herm(0, view(xz, k, :))
-        s[k] = m4(2 * rand(Bool) + !h)
-    end
-    return Clifford(xz, s)
-end
-
 
 function spin_to_binary_indices(spin_indices)
     n = length(spin_indices)
