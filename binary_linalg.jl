@@ -311,11 +311,8 @@ function binary_charge_conserving_symplectic_mat(n)
     @views while !binary_symplectic_inner(b_mat[2, :], b_mat[1, :]) || binary_symplectic_inner(b_mat[2, :], b_mat[3, :])
         rand!(b_mat[2, :])
     end
-    @views while binary_symplectic_inner(b_mat[4, :], b_mat[1, :]) || !binary_symplectic_inner(b_mat[4, :], b_mat[3, :])
-        rand!(b_mat[4, :])
-    end
 
-    @views for i in 5:4m
+    @views for i in 4:4m
         while true
             rand!(b_mat[i, :])
             if iseven(i) && !binary_symplectic_inner(b_mat[i, :], b_mat[i-1, :])

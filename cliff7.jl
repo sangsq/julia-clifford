@@ -198,6 +198,8 @@ function random_cc_clifford(n)
         h = is_herm(0, view(xz, k, :))
         s[k] = m4(2 * rand(Bool) + !h)
     end
+    s[1] = 0
+    s[n+1] = 0
     return Clifford(xz, s)
 end
 
