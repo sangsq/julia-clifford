@@ -184,3 +184,27 @@ function test_measurement()
     end
 end
 # test_measurement()
+
+
+m = 48
+n = 72
+
+for i in 1:10000
+    state = random_state(n, m)
+    mat = state.xz[1:m, :]
+    l = rand(1:n)
+    r = rand(l:n)
+    ed = binary_bidirectional_gaussian!(mat)
+    c1 = 0
+    for i in 1:m
+        if 2l-1 <= ed[i, 1] <= ed[i, 2] <= 2r
+            c1 += 1
+        end
+    end
+    c2 = r-l+1-entropy(state, l:r)
+    if c1 != c2
+        display(mat)
+        @show c1, c2
+        break
+    end
+end

@@ -58,6 +58,12 @@ function all_plus(n)
     return StabState(xz, s, n_stab)
 end
 
+function white_state(n)
+    xz = fill(false, 2n, 2n)
+    s = fill(0, 2n)
+    n_stab = 0
+    return StabState(xz, s, n_stab)
+end
 
 function random_state(n, n_stab)
     tmp = random_clifford(n)
@@ -237,6 +243,7 @@ function clifford_action!(clifford, state, positions)
                     tmp_xz[2k-1] ⊻= clifford.xz[j, 2k-1]
                     tmp_xz[2k] ⊻= clifford.xz[j, 2k]
                 end
+
             end
         end
         s[k] = m4(tmp_s + s[k])
@@ -354,6 +361,14 @@ end
 
 entropy(state) = size(state, 2) - size(state, 1)
 
+function entropy(state, rg)
+    m, n = size(state)
+    rg_bar = setdiff(1:n, rg)
+    indices = spin_to_binary_indices(rg_bar)
+    rk = binary_rank(state.xz[1:m, indices])
+    return length(rg) - m + rk
+end
+
 function left_ee_on_all_cuts(state)
     m, n = size(state)
     mat = state.xz[1:m, 2n:-1:1]
@@ -375,14 +390,12 @@ function mi_on_all_cuts(state)
 end
 
 function mutual_info(state, region1, region2)
-    m, n = size(state)
-    region1 = spin_to_binary_indices(region1)
-    region2 = spin_to_binary_indices(region2)
-    a = binary_rank(@view state.xz[1:m, region1])
-    b = binary_rank(@view state.xz[1:m, region2])
-    c = binary_rank(@view state.xz[1:m, union(region1, region2)])
-    return a + b -c
+    a = entropy(state, region1)
+    b = entropy(state, region2)
+    c = entropy(state, union(region1, region2))
+    return a + b - c
 end
+
 
 function mutual_neg(state, region1, region2)
     m, n = size(state)
