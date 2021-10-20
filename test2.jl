@@ -185,26 +185,59 @@ function test_measurement()
 end
 # test_measurement()
 
+# function tmp()
+#     n = 256
+#     n_step = 10000
 
-m = 48
-n = 72
 
-for i in 1:10000
-    state = random_state(n, m)
-    mat = state.xz[1:m, :]
-    l = rand(1:n)
-    r = rand(l:n)
-    ed = binary_bidirectional_gaussian!(mat)
-    c1 = 0
-    for i in 1:m
-        if 2l-1 <= ed[i, 1] <= ed[i, 2] <= 2r
-            c1 += 1
-        end
-    end
-    c2 = r-l+1-entropy(state, l:r)
-    if c1 != c2
-        display(mat)
-        @show c1, c2
-        break
+#     state = all_up(n)
+#     for _ in 1:n_step
+#         for i in 1:n-3
+#             cliff = random_clifford(4)
+#             clifford_action!(cliff, state, [i, i+1, i+2, i+3])
+#         end
+#     end
+#     return nothing
+# end
+
+# using Profile
+# Profile.clear()
+# Profile.init(Int(1e7), 0.01)
+# @profile tmp()
+
+
+function test_strange_mi()
+    a = 5
+    b = 8
+    for _ in 1:1000
+        m = rand(1:a+2b)
+        state = random_state(a+2b, m)
+        x = strange_AB_mi(state, a)
+        y = [mutual_info(state, b+1:b+a, union(b-i+1:b, a+b+1:a+b+i)) for i in 1:b]
+        @assert x==y
     end
 end
+test_strange_mi()
+
+
+function test_localizable_EE()
+    n = 20
+    m = 10
+    A = 4:9
+    B = 12:16
+    for _ in 1:1000
+        state = random_state(n, m)
+        tmp1 = localizable_EE(state, A, B)
+
+        ob = (0, Bool[1, 0])
+        for i in 1:n
+            if !(i in A) && !(i in B)
+                measurement!(state, ob, [i])
+            end
+        end
+        tmp2 = mutual_info(state, A, B)
+        @assert tmp1 == tmp2
+    end
+end
+
+# test_localizable_EE()

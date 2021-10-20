@@ -48,6 +48,29 @@ function binary_uppertrianglize!(m)
     return pivs, non_pivs
 end
 
+function binary_partial_gaussian!(mat, indices)
+    m, n = size(mat)
+    is_piv_row = zeros(Bool, m)
+    pivs = Int[]
+    for i in indices
+        k = 0
+        for j in 1:m
+            if mat[j, i] && !is_piv_row[j]
+                if k==0
+                    k = j
+                    is_piv_row[k] = true
+                    push!(pivs, i)
+                else
+                    for l in 1:n
+                        mat[j, l] = mat[j, l] ⊻ mat[k, l]
+                    end
+                end
+            end
+        end
+    end
+    return is_piv_row, pivs
+end
+
 
 function binary_uppertrianglize(m)
     m = copy(m)

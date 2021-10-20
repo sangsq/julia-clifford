@@ -256,8 +256,9 @@ end
 """
 forced measurement on pure state
 """
-function fps_measurement!(state, observable::PauliString, positions)
+@views function fps_measurement!(state, observable::PauliString, positions)
     m, n = size(state)
+    xz, s, _ = flat(state)
     @assert m==n
     indices = spin_to_binary_indices(positions)
     tmp = 0
@@ -266,7 +267,7 @@ function fps_measurement!(state, observable::PauliString, positions)
             if tmp == 0
                 tmp = k
             else
-                row_sum!(state, k, tmp)
+                row_sum!(state, k, tmp) 
             end
         end
     end
@@ -497,4 +498,45 @@ end
     mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in 1:l]
     
     return mis
+end
+
+
+function strange_AB_mi(state, A)
+    m, n = size(state)
+    B = div(n - A, 2)
+    mat = zeros(Bool, m, 2n)
+    mat[1:m, 1:2A] = state.xz[1:m, 2B+1:2B+2A]
+    for i in 1:B
+        mat[1:m, 2A+4i-3] = state.xz[1:m, 2(B-i+1)-1]
+        mat[1:m, 2A+4i-2] = state.xz[1:m, 2(B-i+1)]
+        mat[1:m, 2A+4i-1] = state.xz[1:m, 2(A+B+i)-1]
+        mat[1:m, 2A+4i-0] = state.xz[1:m, 2(A+B+i)]
+    end
+    ep = binary_bidirectional_gaussian!(mat)
+    mis = zeros(Int, B)
+    for i in 1:min(2A, m)
+        l = div(ep[i, 1]+1, 2)
+        r = div(ep[i, 2]+1, 2)
+        if (l <= A) && (r > A)
+            mis[div(r-A+1, 2):end] .+= 1
+        end
+    end
+    return mis
+end
+
+
+function localizable_EE(state, A, B)
+    m, n = size(state)
+    E = setdiff(1:n, A, B)
+    mat = state.xz[1:m, :]
+    is_piv_row, pivs = binary_partial_gaussian!(mat, [2i for i in E])
+    bA = spin_to_binary_indices(A)
+    bB = spin_to_binary_indices(B)
+    matA = mat[.!is_piv_row, bA]
+    matB = mat[.!is_piv_row, bB]
+    matAB = cat(matA, matB, dims=2)
+    rkA = binary_rank(matA)
+    rkB = binary_rank(matB)
+    rkAB = binary_rank(matAB)
+    return rkA + rkB - rkAB
 end
