@@ -217,15 +217,15 @@ function test_strange_mi()
         @assert x==y
     end
 end
-test_strange_mi()
+# test_strange_mi()
 
 
 function test_localizable_EE()
     n = 20
-    m = 10
+    m = 20
     A = 4:9
     B = 12:16
-    for _ in 1:1000
+    for _ in 1:10000
         state = random_state(n, m)
         tmp1 = localizable_EE(state, A, B)
 
@@ -239,5 +239,27 @@ function test_localizable_EE()
         @assert tmp1 == tmp2
     end
 end
+test_localizable_EE()
 
-# test_localizable_EE()
+
+
+
+function test_tri_mi()
+    n = 20
+    m = 5
+    A = 3:8
+    B = 13:16
+    C = setdiff(1:n, A, B)
+    for _ in 1:10000
+        state = random_state(n, m)
+        tmp1 = tri_mi(state, A, B, true)
+        tmp2 = entropy(state, A) + entropy(state, B) + entropy(state, C) - entropy(state, union(A, B)) - entropy(state, union(B, C))-entropy(state, union(C, A)) + (n-m)
+        @assert tmp1 == tmp2
+        tmp1 = tri_mi(state, A, B, false)
+        tmp2 = entropy(state, C) - entropy(state, union(B, C))-entropy(state, union(C, A)) + (n-m)
+        @assert tmp1 == tmp2
+    end
+    return nothing
+end
+
+# test_tri_mi()

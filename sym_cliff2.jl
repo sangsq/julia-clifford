@@ -15,8 +15,6 @@ function random_Z2_clifford(n)
     for i in 1:2:2n
         tmp = tmp * (s[i], view(xz, i, :))
     end
-    @show tmp
-    @assert (tmp[1]==0) || (tmp[1]==2)
     (tmp==2) && (s[1] = (s[1] + 2) % 4)
     return Clifford(xz, s)
 end

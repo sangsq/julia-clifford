@@ -58,6 +58,26 @@ function all_plus(n)
     return StabState(xz, s, n_stab)
 end
 
+function white_state(n)
+    xz = fill(false, 2n, 2n)
+    s = fill(0, 2n)
+    n_stab = 0
+    return StabState(xz, s, n_stab)
+end
+
+function partial_up(n, p)
+    xz = fill(false, 2n, 2n)
+    s = fill(0, 2n)
+    j = 0
+    for i in 1:n
+        if rand() < p
+            j += 1
+            xz[j, 2i] = true
+            xz[j+n, 2i-1] = true
+        end
+    end
+    return StabState(xz, s, j)
+end
 
 function random_state(n, n_stab)
     tmp = random_clifford(n)
@@ -191,6 +211,18 @@ function random_clifford(n)
     return Clifford(xz, s)
 end
 
+function random_cc_clifford(n)
+    xz = binary_charge_conserving_symplectic_mat(n)
+    s = fill(0, 2n)
+    for k in 1:2n
+        h = is_herm(0, view(xz, k, :))
+        s[k] = m4(2 * rand(Bool) + !h)
+    end
+    s[1] = 0
+    s[n+1] = 0
+    return Clifford(xz, s)
+end
+
 
 function spin_to_binary_indices(spin_indices)
     n = length(spin_indices)
@@ -225,6 +257,7 @@ function clifford_action!(clifford, state, positions)
                     tmp_xz[2k-1] ⊻= clifford.xz[j, 2k-1]
                     tmp_xz[2k] ⊻= clifford.xz[j, 2k]
                 end
+
             end
         end
         s[k] = m4(tmp_s + s[k])
@@ -237,8 +270,9 @@ end
 """
 forced measurement on pure state
 """
-function fps_measurement!(state, observable::PauliString, positions)
+@views function fps_measurement!(state, observable::PauliString, positions)
     m, n = size(state)
+    xz, s, _ = flat(state)
     @assert m==n
     indices = spin_to_binary_indices(positions)
     tmp = 0
@@ -247,7 +281,7 @@ function fps_measurement!(state, observable::PauliString, positions)
             if tmp == 0
                 tmp = k
             else
-                row_sum!(state, k, tmp)
+                row_sum!(state, k, tmp) 
             end
         end
     end
@@ -342,6 +376,14 @@ end
 
 entropy(state) = size(state, 2) - size(state, 1)
 
+function entropy(state, rg)
+    m, n = size(state)
+    rg_bar = setdiff(1:n, rg)
+    indices = spin_to_binary_indices(rg_bar)
+    rk = binary_rank(state.xz[1:m, indices])
+    return length(rg) - m + rk
+end
+
 function left_ee_on_all_cuts(state)
     m, n = size(state)
     mat = state.xz[1:m, 2n:-1:1]
@@ -363,14 +405,12 @@ function mi_on_all_cuts(state)
 end
 
 function mutual_info(state, region1, region2)
-    m, n = size(state)
-    region1 = spin_to_binary_indices(region1)
-    region2 = spin_to_binary_indices(region2)
-    a = binary_rank(@view state.xz[1:m, region1])
-    b = binary_rank(@view state.xz[1:m, region2])
-    c = binary_rank(@view state.xz[1:m, union(region1, region2)])
-    return a + b -c
+    a = entropy(state, region1)
+    b = entropy(state, region2)
+    c = entropy(state, union(region1, region2))
+    return a + b - c
 end
+
 
 function mutual_neg(state, region1, region2)
     m, n = size(state)
@@ -472,4 +512,87 @@ end
     mis = [rk_A[i] + rk_B[i] - rk_AB[2i] for i in 1:l]
     
     return mis
+end
+
+
+function strange_AB_mi(state, A)
+    m, n = size(state)
+    B = div(n - A, 2)
+    mat = zeros(Bool, m, 2n)
+    mat[1:m, 1:2A] = state.xz[1:m, 2B+1:2B+2A]
+    for i in 1:B
+        mat[1:m, 2A+4i-3] = state.xz[1:m, 2(B-i+1)-1]
+        mat[1:m, 2A+4i-2] = state.xz[1:m, 2(B-i+1)]
+        mat[1:m, 2A+4i-1] = state.xz[1:m, 2(A+B+i)-1]
+        mat[1:m, 2A+4i-0] = state.xz[1:m, 2(A+B+i)]
+    end
+    ep = binary_bidirectional_gaussian!(mat)
+    mis = zeros(Int, B)
+    for i in 1:min(2A, m)
+        l = div(ep[i, 1]+1, 2)
+        r = div(ep[i, 2]+1, 2)
+        if (l <= A) && (r > A)
+            mis[div(r-A+1, 2):end] .+= 1
+        end
+    end
+    return mis
+end
+
+
+function localizable_EE(state, A, B)
+    m, n = size(state)
+    E = setdiff(1:n, A, B)
+    mat = state.xz[1:m, :]
+    is_piv_row, pivs = binary_partial_gaussian!(mat, [2i for i in E])
+    bA = spin_to_binary_indices(A)
+    bB = spin_to_binary_indices(B)
+    matA = mat[.!is_piv_row, bA]
+    matB = mat[.!is_piv_row, bB]
+    matAB = cat(matA, matB, dims=2)
+    rkA = binary_rank(matA)
+    rkB = binary_rank(matB)
+    rkAB = binary_rank(matAB)
+    return rkA + rkB - rkAB
+end
+
+
+function tri_mi(state, A, B, add_mi_AB)
+    m, n = size(state)
+    C = setdiff(1:n, A, B)
+    a, b, c = length(A), length(B), length(C)
+    bA = spin_to_binary_indices(A)
+    bB = spin_to_binary_indices(B)
+    bC = spin_to_binary_indices(C)
+    mat = zeros(Bool, m, 2n)
+    mat[1:m, 1:2a] = @view state.xz[1:m, bA]
+    mat[1:m, 2a+1:2a+2c] = @view state.xz[1:m, bC]
+    mat[1:m, 2a+2c+1:2a+2c+2b] = @view state.xz[1:m, bB]
+    ep = binary_bidirectional_gaussian!(mat)
+    mA, mB, mC, mAC, mCB = 0, 0, 0, 0, 0
+    @inline inA(x) = 0 < x <= 2a
+    @inline inC(x) = 2a < x <= 2a+2c
+    @inline inB(x) = 2a+2c < x <= 2a+2b+2c
+    for i in 1:m
+        l, r = ep[i,:]
+        if inA(r)
+            mA += 1
+            mAC += 1
+        elseif inC(l) && inC(r)
+            mC += 1
+            mAC += 1
+            mCB += 1
+        elseif inB(l)
+            mB += 1
+            mCB += 1
+        elseif inA(l) && inC(r)
+            mAC+= 1
+        elseif inC(l) && inB(r)
+            mCB+= 1
+        end
+    end
+    tri = mCB + mAC - mC - m
+    if add_mi_AB
+        tri += (a+b-entropy(state, union(A, B))) - mA - mB
+    end
+    return tri
 end

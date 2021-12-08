@@ -361,5 +361,12 @@ function binary_charge_conserving_symplectic_mat(n)
         b_mat[4, i], b_mat[2m+2, i] = b_mat[2m+2, i], b_mat[4, i]
     end
 
+    if rand()<0.5
+        for i in 1:4m
+            b_mat[1, i], b_mat[2m+1, i] = b_mat[2m+1, i], b_mat[1, i]
+            b_mat[2, i], b_mat[2m+2, i] = b_mat[2m+2, i], b_mat[2, i]
+        end
+    end
+
     return b_mat
 end 

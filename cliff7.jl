@@ -65,6 +65,20 @@ function white_state(n)
     return StabState(xz, s, n_stab)
 end
 
+function partial_up(n, p)
+    xz = fill(false, 2n, 2n)
+    s = fill(0, 2n)
+    j = 0
+    for i in 1:n
+        if rand() < p
+            j += 1
+            xz[j, 2i] = true
+            xz[j+n, 2i-1] = true
+        end
+    end
+    return StabState(xz, s, j)
+end
+
 function random_state(n, n_stab)
     tmp = random_clifford(n)
     xz = zeros(Bool, 2n, 2n)
@@ -208,6 +222,64 @@ function random_cc_clifford(n)
     s[n+1] = 0
     return Clifford(xz, s)
 end
+
+function random_z2_clifford(n)
+    # sample random n-site clifford gate that preserves \prod X
+    ortho_b_mat = binary_random_orthogonal_matrix(2n)
+    xz = binary_jordan_wigner_transform!(ortho_b_mat)
+    xz[:, 2:2:end] .⊻= xz[:, 1:2:end]
+    xz[1:2:end, :] .⊻= xz[2:2:end, :]
+    s = fill(0, 2n)
+    for i in 1:2n
+        h = is_herm(0, view(xz, i, :))
+        s[i] = (2 * rand(Bool) + h) % 4
+    end
+    tmp = 0, fill(false, 2n)
+    for i in 1:2:2n
+        tmp = tmp * (s[i], view(xz, i, :))
+    end
+    (tmp==2) && (s[1] = (s[1] + 2) % 4)
+    return Clifford(xz, s)
+end
+
+
+"""
+calculate the trace of a clifford unitary
+"""
+function abs_cliff_trace(cliff)
+    xz, s = cliff.xz, cliff.s
+    n = div(length(s), 2)
+    mat = zeros(Bool, 2n, 4n)
+    for i in 1:2n
+        mat[i, i] = true
+    end
+    mat[1:2n, 2n+1:2n+2n] = xz
+
+    xz_minus_i = copy(xz')
+    for i in 1:2n
+        xz_minus_i[i, i] ⊻= true
+    end
+    
+    nullspace = binary_null_space(xz_minus_i)
+
+    n_same = size(nullspace, 2)
+    for i in 1:n_same
+        tmp = 0, zeros(Bool, 4n)
+        for j in 1:2n
+            if nullspace[j, i]
+                tmp = tmp * (s[j], mat[j, :])
+            end
+        end
+#         @show tmp
+        @assert tmp[1]==0 || tmp[1]==2
+        @assert tmp[2][1:2n] == tmp[2][2n+1:4n]
+        if tmp[1]==2
+            return 0
+        end
+    end
+    return 2^(n_same/2)
+end
+
 
 
 function spin_to_binary_indices(spin_indices)
@@ -539,4 +611,46 @@ function localizable_EE(state, A, B)
     rkB = binary_rank(matB)
     rkAB = binary_rank(matAB)
     return rkA + rkB - rkAB
+end
+
+
+function tri_mi(state, A, B, add_mi_AB)
+    m, n = size(state)
+    C = setdiff(1:n, A, B)
+    a, b, c = length(A), length(B), length(C)
+    bA = spin_to_binary_indices(A)
+    bB = spin_to_binary_indices(B)
+    bC = spin_to_binary_indices(C)
+    mat = zeros(Bool, m, 2n)
+    mat[1:m, 1:2a] = @view state.xz[1:m, bA]
+    mat[1:m, 2a+1:2a+2c] = @view state.xz[1:m, bC]
+    mat[1:m, 2a+2c+1:2a+2c+2b] = @view state.xz[1:m, bB]
+    ep = binary_bidirectional_gaussian!(mat)
+    mA, mB, mC, mAC, mCB = 0, 0, 0, 0, 0
+    @inline inA(x) = 0 < x <= 2a
+    @inline inC(x) = 2a < x <= 2a+2c
+    @inline inB(x) = 2a+2c < x <= 2a+2b+2c
+    for i in 1:m
+        l, r = ep[i,:]
+        if inA(r)
+            mA += 1
+            mAC += 1
+        elseif inC(l) && inC(r)
+            mC += 1
+            mAC += 1
+            mCB += 1
+        elseif inB(l)
+            mB += 1
+            mCB += 1
+        elseif inA(l) && inC(r)
+            mAC+= 1
+        elseif inC(l) && inB(r)
+            mCB+= 1
+        end
+    end
+    tri = mCB + mAC - mC - m
+    if add_mi_AB
+        tri += (a+b-entropy(state, union(A, B))) - mA - mB
+    end
+    return tri
 end
