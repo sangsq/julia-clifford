@@ -1,4 +1,4 @@
-## julia-cliffod
+## julia-clifford
 Julia code for simulating quantum stabilizer states and clifford circuit
 ### Methods implemented
 * Efficient sampler for random stabilizer states and Clifford group elements
