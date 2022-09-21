@@ -1,5 +1,5 @@
-include("cliff7.jl")
-include("channels.jl")
+include("../src/cliff7.jl")
+include("../src/channels.jl")
 
 function test_state(state)
     xz, s, n_stab = flat(state)
@@ -239,7 +239,7 @@ function test_localizable_EE()
         @assert tmp1 == tmp2
     end
 end
-test_localizable_EE()
+# test_localizable_EE()
 
 
 
@@ -279,4 +279,17 @@ function test_mutual_info()
     return nothing
 end
 
-test_mutual_info()
+# test_mutual_info()
+
+function test_multiple_negs()
+    n = 10
+    m = 6
+    a = 4
+    for _ in 1:1000
+        state = random_state(n, m)
+        tmp1 = multiple_negs(state, a)
+        tmp2 = [mutual_neg(state, 1:a, a+1:i) for i in a+1:n]
+        @assert tmp1 == tmp2
+    end
+end
+test_multiple_negs()

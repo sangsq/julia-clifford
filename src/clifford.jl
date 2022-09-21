@@ -563,6 +563,43 @@ function mutual_neg(state::StabState, region1, region2)
     return mutual_neg(view(state.xz, 1:m, :), region1, region2)
 end
 
+"""
+return [mutual_neg(state, 1:a, a+1:i) for i in a+1:n]
+"""
+function multiple_negs(state::AbstractArray{Bool, 2}, a)
+    m, n = size(state)
+    n = div(n, 2)
+    mat = copy(state)
+
+    eps = binary_bidirectional_gaussian!(mat)
+    tmp = [(i, eps[i, 2]) for i in 1:m]
+    sort!(tmp, by= x->x[2])
+    new_order = Int[a[1] for a in tmp]
+    eps2 = eps[new_order, :]
+    right_eps = [div(eps2[i,2]+1, 2) for i in 1:m]
+    mat = mat[new_order, :]
+
+    gks = zeros(Int, n)
+    for i in 1:n
+        tmp = findlast(x -> x<=i, right_eps)
+        gks[i] = tmp===nothing ? 0 : tmp
+    end
+
+    K = zeros(Bool, m, m)
+    for i in 1:m, j in i:m
+        @views K[i, j] = K[j, i] = binary_symplectic_inner(mat[i, 1:2a], mat[j, 1:2a])
+    end
+    rank_K = binary_all_diagonal_ranks(K)
+
+    tmp = [gks[i]==0 ? 0 : rank_K[gks[i]] for i in a+1:n]
+    return div.(tmp, 2)
+end
+
+function multiple_negs(state::StabState, a)
+    m, n = size(state)
+    return multiple_negs(view(state.xz, 1:m, :), a)
+end
+
 
 function ap_negativity(state, a, b, l)
     @assert (a<b) && (a+l<=b)
