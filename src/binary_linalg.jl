@@ -35,12 +35,6 @@ function binary_uppertrianglize!(m)
                 m[i, col : dim2] .⊻= @view m[finished_rows + 1, col : dim2]
             end
         end
-        
-        for i in (finished_rows + 2: dim1)
-            if  m[i, col]
-                m[i, col : dim2] .⊻= @view m[finished_rows + 1, col : dim2]
-            end
-        end
 
         finished_rows += 1
     end
@@ -212,10 +206,12 @@ function binary_all_vertical_cut_ranks!(b_mat)
     return rks
 end
 
+
 function binary_all_vertical_cut_ranks(b_mat)
     tmp = copy(b_mat)
     return binary_all_vertical_cut_ranks!(tmp)
 end
+
 
 function binary_symplectic_inner(x, y)
     @assert length(x) == length(y)
@@ -226,6 +222,7 @@ function binary_symplectic_inner(x, y)
     end
     return r
 end
+
 
 @views function binary_random_symplectic_matrix(n)
     b_mat = rand(Bool, 2n, 2n)
@@ -370,3 +367,35 @@ function binary_charge_conserving_symplectic_mat(n)
 
     return b_mat
 end 
+
+
+@views function binary_random_sign_free_symplectic_matrix(n)
+    b_mat = zeros(Bool, 2n, 2n)
+    for i in 1:2n
+        while true
+
+            if isodd(i)
+                rand!(b_mat[i, 1:2:end])
+            else
+                rand!(b_mat[i, 2:2:end])
+            end
+
+            if iseven(i) && !binary_symplectic_inner(b_mat[i, :], b_mat[i-1, :])
+                continue
+            end
+            for j in 1:(isodd(i) ? i-1 : i-2)
+                if binary_symplectic_inner(b_mat[i, :], b_mat[j, :])
+                    k = isodd(j) ? j+1 : j-1
+                    for l in 1:2n
+                        b_mat[i, l] = b_mat[i, l] ⊻ b_mat[k, l]
+                    end
+                end
+            end
+            if all(.!b_mat[i, :])
+                continue
+            end
+            break
+        end
+    end
+    return b_mat
+end

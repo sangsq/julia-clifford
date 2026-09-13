@@ -340,10 +340,10 @@ function clifford_action!(clifford, state, positions)
         for j in 1:2n_act
             if xz[k, indices[j]]
                 tmp_s += clifford.s[j]
-                for k in 1:n_act
-                    tmp_s += 2 * (tmp_xz[2k] * clifford.xz[j, 2k-1])
-                    tmp_xz[2k-1] ⊻= clifford.xz[j, 2k-1]
-                    tmp_xz[2k] ⊻= clifford.xz[j, 2k]
+                for l in 1:n_act
+                    tmp_s += 2 * (tmp_xz[2l] * clifford.xz[j, 2l-1])
+                    tmp_xz[2l-1] ⊻= clifford.xz[j, 2l-1]
+                    tmp_xz[2l] ⊻= clifford.xz[j, 2l]
                 end
 
             end

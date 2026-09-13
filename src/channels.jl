@@ -1,4 +1,4 @@
-include("./cliff7.jl")
+include("./clifford.jl")
 
 """
 if fy != 0, then fx == fz == 0
@@ -54,8 +54,8 @@ end
 
 function dephase_z!(state, i)
     m, n = size(state)
-    _, fy, fz = row_reduce_a_site!(state, i)
-    rows = [fy, fz]
+    fx, fy, _ = row_reduce_a_site!(state, i)
+    rows = [fx, fy]
     sort!(rows, rev=true)
     for tmp in rows
         if tmp != 0
