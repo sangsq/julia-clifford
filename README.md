@@ -1,7 +1,5 @@
 # StabilizerEntanglement.jl
 
-[![CI](https://github.com/sangsq/julia-clifford/actions/workflows/CI.yml/badge.svg)](https://github.com/sangsq/julia-clifford/actions/workflows/CI.yml)
-
 Julia code for simulating stabilizer states, Clifford circuits and stabilizer channels, with a focus on entanglement structure.
 
 ## Features
@@ -51,5 +49,4 @@ ee_on_all_cuts(state)
 ## Layout
 
 - `src/`: package source; `src/old_implementations/` keeps earlier versions that are no longer loaded
-- `test/`: run with `Pkg.test()`
 - `notebooks/`: research notebooks; they predate the package and `include` source files directly
