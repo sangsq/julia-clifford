@@ -1,7 +1,3 @@
-using BenchmarkTools
-include("cliff5.jl")
-include("sym_cliff.jl")
-
 # Random.seed!(1)
 # let
 #     for _ in 1:10000
@@ -36,4 +32,3 @@ function test_binary_all_vertical_cut_ranks()
         @assert a == b
     end
 end
-test_binary_all_vertical_cut_ranks()

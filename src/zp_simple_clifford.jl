@@ -3,8 +3,6 @@ using LinearAlgebra
 using Statistics
 import Base:show, *, length, iterate, size, copy
 
-include("zp_alg.jl")
-
 mutable struct StabState{T}
     xz::Array{T, 2} # (2n, 2n) shape, on each site 10->X, 01->Z, 11->XZ, 1 to n row stab, (n+1) to 2n row destab
 end

@@ -1,5 +1,3 @@
-include("./clifford.jl")
-
 """
 if fy != 0, then fx == fz == 0
 """

@@ -1,6 +1,3 @@
-include("../src/cliff7.jl")
-include("../src/channels.jl")
-
 function test_state(state)
     xz, s, n_stab = flat(state)
     m, n = size(state)
@@ -292,4 +289,3 @@ function test_multiple_negs()
         @assert tmp1 == tmp2
     end
 end
-test_multiple_negs()

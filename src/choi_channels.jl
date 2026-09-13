@@ -1,6 +1,3 @@
-include("cliff6.jl")
-
-
 """
 Here a (m qubit -> n qubit) stabilizer channel is represented by its vectorized Choi state, which is a 2(n+m) qubit pure stabilizer state.
 The ordering of legs is: | n out-left | n out-right | m in-left | m in-right |
@@ -15,15 +12,7 @@ size(ch::StabChannel) = ch.m, ch.n
 
 
 function identity_channel(n)
-    xz = zeros(Bool, 4n, 8n)
-    s = zeros(Int, 4n)
-    for k in 1:2n
-        xz[k   , k   ] = true
-        xz[k+2n, k+2n] = true
-        xz[k   , k+4n] = true
-        xz[k+2n, k+6n] = true
-    end
-    choi = StabState(xz, s, 4n)
+    choi = epr_pairs(2n)
     return StabChannel(choi, n, n)
 end
 
@@ -50,7 +39,7 @@ function clifford_action_on_channel!(clifford, channel, positions)
 end
 
 
-function depolarize!(channel, i)
+function depolarize!(channel::StabChannel, i)
     choi = channel.choi
     m, n = size(channel)
     fps_measurement!(choi, (0, Bool[1, 0, 1, 0]), [i, i+n])
@@ -79,19 +68,26 @@ end
 @views function add_qubits!(channel, l)
     m, n = size(channel)
     choi = channel.choi
-    new_xz = zeros(Bool, 2n+2l+2m, 4n+4l+4m)
-    new_xz[1:2n+2m, 1:2n] = choi.xz[:, 1:2n]
-    new_xz[1:2n+2m, 2n+2l+1:4n+2l] = choi.xz[:, 2n+1:4n]
-    new_xz[1:2n+2m, 4n+4l+1:4n+4l+4m] = choi.xz[:, 4n+1:4n+4m]
-    for i in 1:l
-        new_xz[2n+2m+i, 2n+2i] = true
-        new_xz[2n+2m+l+i, 4n+2l+2i] = true
+    N = 2n+2m
+    M = N+2l
+    new_xz = zeros(Bool, 2M, 2M)
+    for (r_old, r_new) in ((1:N, 1:N), (N+1:2N, M+1:M+N))
+        new_xz[r_new, 1:2n] = choi.xz[r_old, 1:2n]
+        new_xz[r_new, 2n+2l+1:4n+2l] = choi.xz[r_old, 2n+1:4n]
+        new_xz[r_new, 4n+4l+1:4n+4l+4m] = choi.xz[r_old, 4n+1:4n+4m]
     end
-    new_s = zeros(Int, 2m+2n+2l)
-    new_s[1:2n+2n] .= choi.s
+    for i in 1:l
+        new_xz[N+i, 2n+2i] = true
+        new_xz[N+l+i, 4n+2l+2i] = true
+        new_xz[M+N+i, 2n+2i-1] = true
+        new_xz[M+N+l+i, 4n+2l+2i-1] = true
+    end
+    new_s = zeros(Int, 2M)
+    new_s[1:N] .= choi.s[1:N]
+    new_s[M+1:M+N] .= choi.s[N+1:2N]
     choi.xz = new_xz
     choi.s = new_s
-    choi.n_stab = 2n+2l+2m
+    choi.n_stab = M
     channel.n += l
     return nothing
 end

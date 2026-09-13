@@ -1,5 +1,4 @@
 import Base: +, -, *, /, one, iterate, rand, abs, isless, conj, iszero, isone, zero, one, isequal, hash, show
-using Combinatorics
 
 mutable struct Z2_rip
     poly::Array{Bool, 1}
