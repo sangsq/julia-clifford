@@ -1,4 +1,4 @@
-# StabilizerEntanglement.jl
+# StabilizerStates.jl
 
 Julia code for simulating stabilizer states, Clifford circuits and stabilizer channels, with a focus on entanglement structure.
 
@@ -7,8 +7,8 @@ Julia code for simulating stabilizer states, Clifford circuits and stabilizer ch
 - Stabilizer tableau with destabilizers and phases, supporting mixed states, Clifford gates and Pauli measurements
 - Entanglement entropy on all bipartition cuts, mutual information, entanglement negativity, tripartite mutual information, localizable entanglement
 - Samplers for random Clifford gates, including Z₂-symmetric and charge-conserving ensembles
-- Stabilizer channels represented by vectorized Choi states, with decomposition into discarded, dephased and identity parts
-- Clifford quantum cellular automata over Z₂ Laurent polynomials
+- Stabilizer channels represented by vectorized Choi states
+<!-- - Clifford quantum cellular automata over Z₂ Laurent polynomials -->
 - `SimpleClifford`: sign-free pure-state tableau for contracting stabilizer tensor networks
 - `ZpSimpleClifford`: the same for qudits of prime dimension p
 
@@ -22,7 +22,7 @@ Pkg.develop(url="https://github.com/sangsq/julia-clifford")
 ## Usage
 
 ```julia
-using StabilizerEntanglement
+using StabilizerStates
 
 state = all_up(8)
 for t in 1:20, i in 1:7
@@ -40,7 +40,7 @@ channel_decompose(ch)
 ```
 
 ```julia
-using StabilizerEntanglement.ZpSimpleClifford
+using StabilizerStates.ZpSimpleClifford
 
 state = measure_out!(random_state(Zp{3}, 6), [1])
 ee_on_all_cuts(state)

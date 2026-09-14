@@ -1,4 +1,4 @@
-module StabilizerEntanglement
+module StabilizerStates
 
 using LinearAlgebra
 using Random
@@ -34,7 +34,7 @@ include("z2_ri_poly.jl")
 
 module SimpleClifford
 
-using ..StabilizerEntanglement: binary_all_vertical_cut_ranks, binary_bidirectional_gaussian!,
+using ..StabilizerStates: binary_all_vertical_cut_ranks, binary_bidirectional_gaussian!,
     binary_random_sign_free_symplectic_matrix, binary_random_symplectic_matrix
 
 export StabState, Clifford, nsites, tproduct, all_up, all_plus, epr_pairs, random_state,
@@ -47,7 +47,7 @@ end
 
 module ZpSimpleClifford
 
-using ..StabilizerEntanglement: binary_bidirectional_gaussian!
+using ..StabilizerStates: binary_bidirectional_gaussian!
 
 export Zp, zp_uppertrianglize, zp_uppertrianglize!, zp_rank, zp_bidirectional_gaussian,
     zp_bidirectional_gaussian!, zp_all_vertical_cut_ranks, zp_all_vertical_cut_ranks!,
